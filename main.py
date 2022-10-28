@@ -13,8 +13,8 @@ vertical_deadzone_color = "#52503a"
 radial_deadzone_color = "#52503a"
 
 #Size config
-display_scale = 3
-canvas_dimensions = (200 * display_scale, 190 * display_scale)
+display_scale = 2
+canvas_dimensions = (240 * display_scale, 200 * display_scale)
 display_radius = 50 * display_scale
 stick_display_radius = 10 * display_scale
 outline_width = 2 * display_scale
@@ -22,7 +22,7 @@ font_size = 12 * display_scale
 
 #Config
 vibration_enabled = True
-vibration_length = 0.15
+vibration_length = 0.1
 
 vertical_deadzone = 0.3
 radial_deadzone = 0.6
@@ -30,7 +30,81 @@ radial_deadzone = 0.6
 column_outermargin = 0.10
 column_innermargin = 0.05
 
+# Gear modes
 starting_gear_mode = 4
+gear_modes = [
+    (
+        "0 Gears",  # Name
+        0,          # Column count
+        (
+            (),
+        )        # Gears
+    ),
+    (
+        "1 Gear",
+        1,
+        (
+            (
+                ("1", "num1"),
+                ("R", "num0")
+            ),
+        )
+    ),
+    (
+        "3 Gears",
+        2,
+        (
+            (
+                ("1", "num1"), ("3", "num3"),
+                ("2", "num2"), ("R", "num0")
+            ),
+        )
+    ),
+    (
+        "5 Gears",
+        3,
+        (
+            (
+                ("1", "num1"), ("3", "num3"), ("5", "num5"),
+                ("2", "num2"), ("4", "num4"), ("R", "num0")
+            ),
+        )
+    ),
+    (
+        "7 Gears",
+        4,
+        (
+            (
+                ("1", "num1"), ("3", "num3"), ("5", "num5"), ("7", "num7"),
+                ("2", "num2"), ("4", "num4"), ("6", "num6"), ("R", "num0")
+            ),
+        )
+    ),
+    (
+        "9 Gears",
+        5,
+        (
+            (
+                ("1", "num1"), ("3", "num3"), ("5", "num5"), ("7", "num7"), ("9", "num9"),
+                ("2", "num2"), ("4", "num4"), ("6", "num6"), ("8", "num8"), ("R", "num0")
+            ),
+        )
+    ),
+    (
+        "16 Gears (2 Layers - LS)",
+        5,
+        (
+            (
+                ("1", "num1"), ("3", "num3"), ("5", "num5"), ("7", "num7"), ("", ""),
+                ("2", "num2"), ("4", "num4"), ("6", "num6"), ("8", "num8"), ("R", "num0")
+            ),
+            (
+                (" 9", "num9"), ("11", "f14"), ("13", "f16"), ("15", "f18"), ("", ""),
+                ("10", "f13"), ("12", "f15"), ("14", "f17"), ("16", "f19"), ("R ", "num0")
+            ),
+        )
+    )
+]
 
 # END CONFIG -----------------------------------------------------------------------------------------------------------
 
@@ -64,28 +138,53 @@ gears_enabled_global = False
 
 # Display
 l_thumb_pos = (canvas_dimensions[0] / 2, canvas_dimensions[1] / 2)
+l_thumb_stick_pos = l_thumb_pos
 
 # Gear column checkerbox design
 gear_columns = []
 for i in range(10):
     gear_columns.append(canvas.create_rectangle(0, 0, 0, 0, width=0, fill=column_checkerboard_color if i % 2 == 0 else column_checkerboard_color_alt))
 
-canvas_vertical_deadzone = canvas.create_rectangle(l_thumb_pos[0] - display_radius, l_thumb_pos[1] - vertical_deadzone * display_radius, l_thumb_pos[0] + display_radius, l_thumb_pos[1] + vertical_deadzone * display_radius, width=0, fill=vertical_deadzone_color)
-canvas_radial_deadzone = canvas.create_oval(((l_thumb_pos[0] - display_radius * (radial_deadzone), l_thumb_pos[1] - display_radius * (radial_deadzone)), (l_thumb_pos[0] + display_radius * (radial_deadzone), l_thumb_pos[1] + display_radius * (radial_deadzone))), width=0, fill=radial_deadzone_color)
+canvas_vertical_deadzone = canvas.create_rectangle(
+    l_thumb_pos[0] - display_radius, l_thumb_pos[1] - vertical_deadzone * display_radius,
+    l_thumb_pos[0] + display_radius, l_thumb_pos[1] + vertical_deadzone * display_radius,
+    width=0, fill=vertical_deadzone_color
+)
+canvas_radial_deadzone = canvas.create_oval(
+    l_thumb_pos[0] - display_radius * radial_deadzone, l_thumb_pos[1] - display_radius * radial_deadzone,
+    l_thumb_pos[0] + display_radius * radial_deadzone, l_thumb_pos[1] + display_radius * radial_deadzone,
+    width=0, fill=radial_deadzone_color
+)
 
-l_thumb_outline = canvas.create_oval(((l_thumb_pos[0] - display_radius, l_thumb_pos[1] - display_radius),
-                                      (l_thumb_pos[0] + display_radius, l_thumb_pos[1] + display_radius)), width=outline_width, outline=text_color)
+l_thumb_outline = canvas.create_oval(
+    l_thumb_pos[0] - display_radius, l_thumb_pos[1] - display_radius,
+    l_thumb_pos[0] + display_radius, l_thumb_pos[1] + display_radius,
+    width=outline_width, outline=text_color
+)
 
-l_thumb_stick_pos = l_thumb_pos
+l_thumb_stick = canvas.create_oval(
+    l_thumb_stick_pos[0] - stick_display_radius, l_thumb_stick_pos[1] - stick_display_radius,
+    l_thumb_stick_pos[0] + stick_display_radius, l_thumb_stick_pos[1] + stick_display_radius,
+    width=outline_width, outline=text_color
+)
 
-l_thumb_stick = canvas.create_oval(((l_thumb_stick_pos[0] - stick_display_radius, l_thumb_stick_pos[1] - stick_display_radius),
-                                         (l_thumb_stick_pos[0] + stick_display_radius, l_thumb_stick_pos[1] + stick_display_radius)), width=outline_width, outline=text_color)
+gear_display = canvas.create_text(
+    l_thumb_pos[0], l_thumb_pos[1], fill=text_color,
+    text="", font=("Consolas Bold", font_size)
+)
+cur_gear_display = canvas.create_text(
+    l_thumb_pos[0], l_thumb_pos[1], fill=gear_selected_text,
+    text="", font=("Consolas Bold", font_size)
+)
 
-gear_display = canvas.create_text(l_thumb_pos[0], l_thumb_pos[1], fill=text_color, text="", font=("Consolas Bold", font_size))
-cur_gear_display = canvas.create_text(l_thumb_pos[0], l_thumb_pos[1], fill=gear_selected_text, text="", font=("Consolas Bold", font_size))
-
-colcount_display = canvas.create_text(l_thumb_pos[0], l_thumb_pos[1] - display_radius * 1.5, fill=text_color, text="Press Start", font=("Consolas Bold", font_size))
-keys_pressed_display = canvas.create_text(l_thumb_pos[0], l_thumb_pos[1] + display_radius * 1.5, fill=text_color, text="???", font=("Consolas Bold", font_size))
+colcount_display = canvas.create_text(
+    l_thumb_pos[0], l_thumb_pos[1] - display_radius * 1.5, fill=text_color,
+    text="Press Start", font=("Consolas Bold", font_size)
+)
+keys_pressed_display = canvas.create_text(
+    l_thumb_pos[0], l_thumb_pos[1] + display_radius * 1.5, fill=text_color,
+    text="", font=("Consolas Bold", font_size)
+)
 
 
 # Prepare controllers
@@ -138,7 +237,11 @@ while 1:
                     controller.gears_enabled = True
                     gears_enabled_global = True
             elif event.button == "LEFT_THUMB":
-                controller.alt_gears = not controller.alt_gears
+                if not gears_enabled_global:
+                    controller.gears_enabled = True
+                    gears_enabled_global = True
+                else :
+                    controller.alt_gears = not controller.alt_gears
 
     c_index = 0
     for c in controllers:
@@ -153,54 +256,15 @@ while 1:
             XInput.set_deadzone(DEADZONE_LEFT_THUMB, 0)
             vertical_deadzone = vertical_deadzone
 
-            #Column definition
-            cur_colcount = c.gear_mode
-
-            if c.gear_mode == 6:
-                keys = [
-                    [
-                        ("1", "num1"), ("3", "num3"), ("5", "num5"), ("7", "num7"), (" ", ""),
-                        ("2", "num2"), ("4", "num4"), ("6", "num6"), ("8", "num8"), ("R", "num0")
-                    ],
-                    [
-                        (" 9", "num9"), ("11", "f14"), ("13", "f16"), ("15", "f18"), ("  ", ""),
-                        ("10", "f13"), ("12", "f15"), ("14", "f17"), ("16", "f19"), ("R ", "num0")
-                    ]
-                ]
-                cur_colcount = 5
-            elif c.gear_mode == 5:
-                keys = [[
-                    ("1", "num1"), ("3", "num3"), ("5", "num5"), ("7", "num7"), ("9", "num9"),
-                    ("2", "num2"), ("4", "num4"), ("6", "num6"), ("8", "num8"), ("R", "num0")
-                ]]
-            if c.gear_mode == 4:
-                keys = [[
-                    ("1", "num1"), ("3", "num3"), ("5", "num5"), ("7", "num7"),
-                    ("2", "num2"), ("4", "num4"), ("6", "num6"), ("R", "num0")
-                ]]
-            elif c.gear_mode == 3:
-                keys = [[
-                    ("1", "num1"), ("3", "num3"), ("5", "num5"),
-                    ("2", "num2"), ("4", "num4"), ("R", "num0")
-                ]]
-            elif c.gear_mode == 2:
-                keys = [[
-                    ("1", "num1"), ("3", "num3"),
-                    ("2", "num2"), ("R", "num0")
-                ]]
-            elif c.gear_mode == 1:
-                keys = [[
-                    ("1", "num1"),
-                    ("R", "num0")
-                ]]
+            # Choose gear set
+            keys = gear_modes[c.gear_mode][2]
+            cur_colcount = gear_modes[c.gear_mode][1]
 
             colwidth = (2 - 2 * column_outermargin) / cur_colcount - column_innermargin
 
             canvas.itemconfig(cur_gear_display, text="N")
-            if c.gear_mode == 6:
-                canvas.itemconfig(colcount_display, text="<LB  5 columns  RB>" "\n   2 layers (LS)")
-            else:
-                canvas.itemconfig(colcount_display, text="<LB  " + str(cur_colcount) + " columns  RB>")
+
+            canvas.itemconfig(colcount_display, text="<LB   " + gear_modes[c.gear_mode][0] + "   RB>")
 
             #Choose key set
             selected_keys = keys[c.alt_gears if c.gear_mode == 6 else 0]
@@ -239,10 +303,13 @@ while 1:
 
                     if (stick_pos_y > vertical_deadzone or stick_pos_y < -vertical_deadzone) and math.dist((0, 0), (stick_pos_x, stick_pos_y)) > radial_deadzone:
                         if stick_pos_x > _range_start and stick_pos_x < _range_end:
-                            row_offset = cur_colcount if stick_pos_y < 0 else 0
-                            gear_selected = selected_keys[col_index + row_offset]
 
-                            canvas.itemconfig(cur_gear_display, text=gear_selected[0])
+                            row_offset = cur_colcount if stick_pos_y < 0 else 0
+                            key_candidate = selected_keys[col_index + row_offset]
+
+                            if key_candidate[0] != "":
+                                gear_selected = key_candidate
+                                canvas.itemconfig(cur_gear_display, text=gear_selected[0])
 
                     i += colwidth + column_innermargin
                     col_index += 1
