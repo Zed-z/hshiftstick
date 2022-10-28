@@ -12,17 +12,19 @@ gear_selected_text = "yellow"
 vertical_deadzone_color = "#52503a"
 radial_deadzone_color = "#52503a"
 
-#Size config
+# Size config
 display_scale = 2
 canvas_dimensions = (240 * display_scale, 200 * display_scale)
 display_radius = 50 * display_scale
 stick_display_radius = 10 * display_scale
 outline_width = 2 * display_scale
 font_size = 12 * display_scale
+text_font = ("Consolas Bold", font_size)
 
-#Config
+# Controller config
 vibration_enabled = True
-vibration_length = 0.1
+vibration_length = 0.15
+vibration_strength = (1.0, 0.5)
 
 vertical_deadzone = 0.3
 radial_deadzone = 0.6
@@ -36,9 +38,9 @@ gear_modes = [
     (
         "0 Gears",  # Name
         0,          # Column count
-        (
+        (           # Gears
             (),
-        )        # Gears
+        )
     ),
     (
         "1 Gear",
@@ -91,7 +93,21 @@ gear_modes = [
         )
     ),
     (
-        "16 Gears (2 Layers - LS)",
+        "12 Gears (2 Layers)",
+        4,
+        (
+            (
+                ("1", "num1"), ("3", "num3"), ("5", "num5"), ("", ""),
+                ("2", "num2"), ("4", "num4"), ("6", "num6"), ("R", "num0")
+            ),
+            (
+                (" 7", "num7"), (" 9", "num9"), ("11", "f14"), ("", ""),
+                (" 8", "num8"), ("10", "f13"), ("12", "f15"), ("R ", "num0")
+            ),
+        )
+    ),
+    (
+        "16 Gears (2 Layers)",
         5,
         (
             (
@@ -123,6 +139,15 @@ except ImportError:
     import Tkinter as tk
 
 import math
+import time
+
+
+# Functions
+def stick_in_deadzone(stick_x, stick_y):
+    global vertical_deadzone
+    global radial_deadzone
+    return not (stick_y > vertical_deadzone or stick_y < -vertical_deadzone)\
+        or math.dist((0, 0), (stick_x, stick_y)) <= radial_deadzone
 
 
 # Prepare canvas
@@ -143,7 +168,9 @@ l_thumb_stick_pos = l_thumb_pos
 # Gear column checkerbox design
 gear_columns = []
 for i in range(10):
-    gear_columns.append(canvas.create_rectangle(0, 0, 0, 0, width=0, fill=column_checkerboard_color if i % 2 == 0 else column_checkerboard_color_alt))
+    gear_columns.append(canvas.create_rectangle(0, 0, 0, 0, width=0,
+        fill=column_checkerboard_color if i % 2 == 0 else column_checkerboard_color_alt
+    ))
 
 canvas_vertical_deadzone = canvas.create_rectangle(
     l_thumb_pos[0] - display_radius, l_thumb_pos[1] - vertical_deadzone * display_radius,
@@ -170,20 +197,20 @@ l_thumb_stick = canvas.create_oval(
 
 gear_display = canvas.create_text(
     l_thumb_pos[0], l_thumb_pos[1], fill=text_color,
-    text="", font=("Consolas Bold", font_size)
+    text="", font=text_font
 )
 cur_gear_display = canvas.create_text(
     l_thumb_pos[0], l_thumb_pos[1], fill=gear_selected_text,
-    text="", font=("Consolas Bold", font_size)
+    text="", font=text_font
 )
 
 colcount_display = canvas.create_text(
     l_thumb_pos[0], l_thumb_pos[1] - display_radius * 1.5, fill=text_color,
-    text="Press Start", font=("Consolas Bold", font_size)
+    text="Press Start", font=text_font
 )
 keys_pressed_display = canvas.create_text(
     l_thumb_pos[0], l_thumb_pos[1] + display_radius * 1.5, fill=text_color,
-    text="", font=("Consolas Bold", font_size)
+    text="", font=text_font
 )
 
 
@@ -195,6 +222,7 @@ class Controller:
         self.alt_gears = False
         self.keys_currently_pressed = []
         self.gear_mode = starting_gear_mode
+        self.vibration_countdown = -1
 
 
 controllers = (
@@ -219,28 +247,27 @@ while 1:
         elif event.type == EVENT_STICK_MOVED:
             if event.stick == LEFT:
                 if controller.gears_enabled:
-                    l_thumb_stick_pos = (int(round(l_thumb_pos[0] + display_radius * event.x, 0)),
-                                         int(round(l_thumb_pos[1] - display_radius * event.y, 0)))
+                    l_thumb_stick_pos = (
+                        int(round(l_thumb_pos[0] + display_radius * event.x, 0)),
+                        int(round(l_thumb_pos[1] - display_radius * event.y, 0))
+                    )
                     canvas.coords(l_thumb_stick, (
-                    l_thumb_stick_pos[0] - stick_display_radius, l_thumb_stick_pos[1] - stick_display_radius, l_thumb_stick_pos[0] + stick_display_radius,
-                    l_thumb_stick_pos[1] + stick_display_radius))
+                        l_thumb_stick_pos[0] - stick_display_radius, l_thumb_stick_pos[1] - stick_display_radius,
+                        l_thumb_stick_pos[0] + stick_display_radius, l_thumb_stick_pos[1] + stick_display_radius
+                    ))
 
         elif event.type == EVENT_BUTTON_PRESSED:
-            if event.button == "LEFT_SHOULDER":
+            if event.button in ("DPAD_LEFT", "LEFT_SHOULDER"):
                 controller.gear_mode -= 1
                 controller.gear_mode = max(controller.gear_mode, 1)
-            elif event.button == "RIGHT_SHOULDER":
+            elif event.button in ("DPAD_RIGHT", "RIGHT_SHOULDER"):
                 controller.gear_mode += 1
-                controller.gear_mode = min(controller.gear_mode, 6)
-            elif event.button == "START":
+                controller.gear_mode = min(controller.gear_mode, len(gear_modes) - 1)
+            elif event.button in ("START", "LEFT_THUMB"):
                 if not gears_enabled_global:
                     controller.gears_enabled = True
                     gears_enabled_global = True
-            elif event.button == "LEFT_THUMB":
-                if not gears_enabled_global:
-                    controller.gears_enabled = True
-                    gears_enabled_global = True
-                else :
+                else:
                     controller.alt_gears = not controller.alt_gears
 
     c_index = 0
@@ -248,13 +275,9 @@ while 1:
         if c.gears_enabled:
             state = XInput.get_state(c_index)
 
-            #Stick pos
+            # Stick pos
             stick_pos_x = XInput.get_thumb_values(state)[0][0]
             stick_pos_y = XInput.get_thumb_values(state)[0][1]
-
-            #Deadzone
-            XInput.set_deadzone(DEADZONE_LEFT_THUMB, 0)
-            vertical_deadzone = vertical_deadzone
 
             # Choose gear set
             keys = gear_modes[c.gear_mode][2]
@@ -264,12 +287,12 @@ while 1:
 
             canvas.itemconfig(cur_gear_display, text="N")
 
-            canvas.itemconfig(colcount_display, text="<LB   " + gear_modes[c.gear_mode][0] + "   RB>")
+            canvas.itemconfig(colcount_display, text="< " + gear_modes[c.gear_mode][0] + " >")
 
-            #Choose key set
-            selected_keys = keys[c.alt_gears if c.gear_mode == 6 else 0]
+            # Choose key set
+            selected_keys = keys[c.alt_gears if len(gear_modes[c.gear_mode][2]) > 1 else 0]
 
-            #Visual gear display
+            # Visual gear display
             txt = ""
             for ii in range(len(selected_keys)):
                 txt += selected_keys[ii][0]
@@ -284,7 +307,7 @@ while 1:
                 canvas.coords(gear_columns[i], 0, 0, 0, 0)
 
 
-            #Select gear and change gear display
+            # Select gear and change gear display
             gear_selected = -1
 
             if True:
@@ -301,8 +324,8 @@ while 1:
                                   l_thumb_pos[0] + (_range_end) * display_radius,
                                   l_thumb_pos[1] + display_radius)
 
-                    if (stick_pos_y > vertical_deadzone or stick_pos_y < -vertical_deadzone) and math.dist((0, 0), (stick_pos_x, stick_pos_y)) > radial_deadzone:
-                        if stick_pos_x > _range_start and stick_pos_x < _range_end:
+                    if not stick_in_deadzone(stick_pos_x, stick_pos_y):
+                        if _range_start < stick_pos_x < _range_end:
 
                             row_offset = cur_colcount if stick_pos_y < 0 else 0
                             key_candidate = selected_keys[col_index + row_offset]
@@ -315,32 +338,35 @@ while 1:
                     col_index += 1
 
 
-            #Reset all keys but the selected one
+            # Press and unpress keys
             for kc in keys:
                 for k in kc:
                     if gear_selected != -1 and k[1] == gear_selected[1]:
+                        # Start pressing keys
                         if k[1] not in c.keys_currently_pressed:
 
                             pyautogui.keyDown(k[1])
-                            #print("started pressing", k[1])
-
-                            if vibration_enabled:
-                                XInput.set_vibration(c_index, 0.5, 0.25)
-                                time.sleep(vibration_length)
-                                XInput.set_vibration(c_index, 0.0, 0.0)
-
+                            # print("started pressing", k[1])
                             c.keys_currently_pressed.append(k[1])
-
+                            # Vibrate
+                            if vibration_enabled:
+                                XInput.set_vibration(c_index, vibration_strength[0], vibration_strength[1])
+                                c.vibration_countdown = time.time()
                     else:
+                        # Stop pressing keys (if pressed)
                         if k[1] in c.keys_currently_pressed:
 
                             pyautogui.keyUp(k[1])
-                            #print("stopped pressing", k[1])
-
+                            # print("stopped pressing", k[1])
                             c.keys_currently_pressed.remove(k[1])
 
-            #Display pressed key
-            canvas.itemconfig(keys_pressed_display, text=" ".join(c.keys_currently_pressed))
+            # Display pressed key
+            canvas.itemconfig(keys_pressed_display, text="Pressed: " + " ".join(c.keys_currently_pressed) if len(c.keys_currently_pressed) > 0 else "")
+
+            # Stop vibration
+            if c.vibration_countdown != -1 and time.time() - c.vibration_countdown > vibration_length:
+                XInput.set_vibration(c_index, 0.0, 0.0)
+                c.vibration_countdown = -1
 
         c_index += 1
 
