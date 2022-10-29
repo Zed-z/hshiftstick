@@ -165,8 +165,6 @@ else:
     config.read('config.ini')
     config.add_section('main')
 
-    config.set("main", "cpu_cycle_limit", "0.05") # If over 0, introduces a sleep time (in seconds) inbetween loop cycles
-
     config.set("main", "vibration_enabled", "1")
 
     config.set("main", "vertical_deadzone_left", '0.3')
@@ -184,8 +182,6 @@ else:
 
     with open('config.ini', 'w') as f:
         config.write(f)
-
-cpu_cycle_limit = float(config.get("main", "cpu_cycle_limit"))
 
 vibration_enabled = bool(config.get("main", "vibration_enabled"))
 
@@ -243,6 +239,8 @@ gear_selected_font = ("Consolas Bold", 24 * display_scale)
 vibration_length = 0.15
 vibration_strength = (1.0, 0.5)
 
+# If over 0, introduces a sleep time (in seconds) inbetween loop cycles when not in focus
+cpu_cycle_limit = 0.1
 
 # Prepare canvas
 root = tk.Tk()
@@ -530,5 +528,5 @@ while 1:
     except tk.TclError:
         break
 
-    if cpu_cycle_limit > 0:
+    if not root.focus_displayof() and cpu_cycle_limit > 0:
         time.sleep(cpu_cycle_limit)
