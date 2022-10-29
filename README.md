@@ -7,6 +7,7 @@
  - python
  - Xinput-Python
  - pyautogui
+ - tkinter
 
 # Pyinstaller command
  - python -m PyInstaller --onefile -w -F --icon='icon.ico' --add-data "icon.ico;." hshiftstick.py

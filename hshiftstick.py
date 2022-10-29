@@ -2,6 +2,7 @@
 
 # Color config
 background_color = "#313335"
+window_background_color = "#2b2b2b"
 
 column_checkerboard_color = "#3c3f41"
 column_checkerboard_color_alt = "#2b2b2b"
@@ -14,12 +15,15 @@ radial_deadzone_color = "#52503a"
 
 # Size config
 display_scale = 2
-canvas_dimensions = (240 * display_scale, 200 * display_scale)
+canvas_dimensions = (260 * display_scale, 200 * display_scale)
 display_radius = 50 * display_scale
 stick_display_radius = 10 * display_scale
 outline_width = 2 * display_scale
+margin = 10 * display_scale
 font_size = 12 * display_scale
 text_font = ("Consolas Bold", font_size)
+button_padding = 6 * display_scale
+button_font = ("Consolas", 4 * display_scale)
 
 # Controller config
 vibration_enabled = True
@@ -171,6 +175,13 @@ def toggle_vibration(button):
     vibration_enabled = not vibration_enabled
     button.config(text="Vibration: " + ("ON" if vibration_enabled else "OFF"))
 
+def select_button(widget):
+    widget['bg'] = 'green'
+    widget['activebackground'] = 'green'
+    widget['relief'] = 'sunken'
+
+    previously_clicked = widget
+
 # This function can get temp path for your resource file
 # relative_path is your icon file name
 # https://stackoverflow.com/questions/71006377/tkinter-icon-is-not-working-after-converting-to-exe
@@ -187,27 +198,37 @@ def resource_path(relative_path):
 
 # Prepare canvas
 root = tk.Tk()
+root.config(bg=window_background_color)
 root.title("HStickShift")
 root.iconbitmap(resource_path("icon.ico"))
+
 canvas = tk.Canvas(root, width=canvas_dimensions[0], height=canvas_dimensions[1], bg=background_color)
+canvas.config(highlightthickness=0) # Remove outline
 canvas.pack()
 
 
 # Gear controller variables
 gears_enabled_global = False
 gear_controller = -1
+gear_controller_index = -1
 
 
 # Display
 l_thumb_pos = (canvas_dimensions[0] / 2, canvas_dimensions[1] / 2)
 l_thumb_stick_pos = l_thumb_pos
 
-# Gear column checkerbox design
+# Gear column checkerboard design
 gear_columns = []
 for i in range(10):
     gear_columns.append(canvas.create_rectangle(0, 0, 0, 0, width=0,
         fill=column_checkerboard_color if i % 2 == 0 else column_checkerboard_color_alt
     ))
+# Big circle to mask checkerboard
+canvas.create_oval(
+    l_thumb_pos[0] - display_radius * 2, l_thumb_pos[1] - display_radius * 2,
+    l_thumb_pos[0] + display_radius * 2, l_thumb_pos[1] + display_radius * 2,
+    width=display_radius * 2, outline=background_color
+)
 
 canvas_vertical_deadzone = canvas.create_rectangle(
     l_thumb_pos[0] - display_radius, l_thumb_pos[1] - vertical_deadzone * display_radius,
@@ -241,8 +262,12 @@ cur_gear_display = canvas.create_text(
     text="", font=text_font
 )
 
-colcount_display = canvas.create_text(
-    l_thumb_pos[0], l_thumb_pos[1] - display_radius * 1.5, fill=text_color,
+mode_display_bf = canvas.create_rectangle(
+    0, 0, canvas_dimensions[0], l_thumb_pos[1] - display_radius - margin,
+    width=0, fill=window_background_color
+)
+mode_display = canvas.create_text(
+    l_thumb_pos[0], l_thumb_pos[1] - display_radius * 1.5 - margin / 2, fill=text_color,
     text="Press LS / Start", font=text_font
 )
 keys_pressed_display = canvas.create_text(
@@ -308,129 +333,132 @@ while 1:
                     controller.gears_enabled = True
                     gears_enabled_global = True
                     gear_controller = controller
+                    gear_controller_index = event.user_index
 
                     # Create buttons
-                    widget = tk.Button(None, text='Previous Mode (LB)')
+                    widget = tk.Button(None, text='Previous Mode (LB)', font=button_font)
+                    widget.config(bg='#3c3f41', fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
+                    widget.config(activebackground='gray', activeforeground=text_color)
                     widget.bind('<Button-1>', lambda e: cycle_gear_mode(-1))
                     widget.pack(in_=None, side=tk.LEFT)
 
-                    widget2 = tk.Button(None, text='Next Mode (RB)')
-                    widget2.bind('<Button-1>', lambda e: cycle_gear_mode(1))
-                    widget2.pack(in_=None, side=tk.LEFT)
+                    widget = tk.Button(None, text='Next Mode (RB)', font=button_font)
+                    widget.config(bg='#3c3f41', fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
+                    widget.config(activebackground='gray', activeforeground=text_color)
+                    widget.bind('<Button-1>', lambda e: cycle_gear_mode(1))
+                    widget.pack(in_=None, side=tk.LEFT)
 
-                    widget2 = tk.Button(None, text='Switch Layer (LS)')
-                    widget2.bind('<Button-1>', lambda e: toggle_gear_layer())
-                    widget2.pack(in_=None, side=tk.LEFT)
+                    widget = tk.Button(None, text='Switch Layer (LS)', font=button_font)
+                    widget.config(bg='#3c3f41', fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
+                    widget.config(activebackground='gray', activeforeground=text_color)
+                    widget.bind('<Button-1>', lambda e: toggle_gear_layer())
+                    widget.pack(in_=None, side=tk.LEFT)
 
-                    widget3 = tk.Button(None, text="Vibration: " + ("ON" if vibration_enabled else "OFF"))
-                    widget3.bind('<Button-1>', lambda e: toggle_vibration(widget3))
-                    widget3.pack(in_=None, side=tk.RIGHT)
+                    widget = tk.Button(None, text="Vibration: " + ("ON" if vibration_enabled else "OFF"), font=button_font)
+                    widget.config(bg='#3c3f41', fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
+                    widget.config(activebackground='gray', activeforeground=text_color)
+                    widget.bind('<Button-1>', lambda e: toggle_vibration(widget))
+                    widget.pack(in_=None, side=tk.RIGHT)
 
                 else:
                     toggle_gear_layer()
 
     # Gear logic
-    c_index = 0
-    for c in controllers:
-        if c.gears_enabled:
-            state = XInput.get_state(c_index)
+    if gear_controller != -1:
+        state = XInput.get_state(gear_controller_index)
 
-            # Stick pos
-            stick_pos_x = XInput.get_thumb_values(state)[0][0]
-            stick_pos_y = XInput.get_thumb_values(state)[0][1]
+        # Stick pos
+        stick_pos_x = XInput.get_thumb_values(state)[0][0]
+        stick_pos_y = XInput.get_thumb_values(state)[0][1]
 
-            # Choose gear set
-            keys = gear_modes[gear_mode][2]
-            cur_colcount = gear_modes[gear_mode][1]
+        # Choose gear set
+        keys = gear_modes[gear_mode][2]
+        colcount = gear_modes[gear_mode][1]
 
-            colwidth = (2 - 2 * column_outermargin) / cur_colcount - column_innermargin
+        colwidth = (2 - 2 * column_outermargin) / colcount - column_innermargin
 
-            canvas.itemconfig(cur_gear_display, text="N")
+        canvas.itemconfig(cur_gear_display, text="N")
 
-            canvas.itemconfig(colcount_display, text="< " + gear_modes[gear_mode][0] + " >")
+        canvas.itemconfig(mode_display, text="< " + gear_modes[gear_mode][0] + " >")
 
-            # Choose key set
-            selected_keys = keys[c.alt_gears if len(gear_modes[gear_mode][2]) > 1 else 0]
+        # Choose key set
+        selected_keys = keys[gear_controller.alt_gears if len(gear_modes[gear_mode][2]) > 1 else 0]
 
-            # Visual gear display
-            txt = ""
-            for ii in range(len(selected_keys)):
-                txt += selected_keys[ii][0]
-                if ii == cur_colcount - 1:
-                    txt += "\n\n"
-                elif ii < len(selected_keys) - 1:
-                    txt += " "
-            canvas.itemconfig(gear_display, text=txt)
+        # Visual gear display
+        txt = ""
+        for ii in range(len(selected_keys)):
+            txt += selected_keys[ii][0]
+            if ii == colcount - 1:
+                txt += "\n\n"
+            elif ii < len(selected_keys) - 1:
+                txt += " "
+        canvas.itemconfig(gear_display, text=txt)
 
-            # Gear column checkerboard display
-            for i in range(len(gear_columns)):
-                canvas.coords(gear_columns[i], 0, 0, 0, 0)
+        # Gear column checkerboard display
+        for i in range(len(gear_columns)):
+            canvas.coords(gear_columns[i], 0, 0, 0, 0)
 
+        # Select gear and change gear display
+        gear_selected = -1
 
-            # Select gear and change gear display
-            gear_selected = -1
+        if True:
+            i = -1 + column_outermargin + column_innermargin / 2
+            col_index = 0
+            while i < 1 - column_outermargin:
 
-            if True:
-                i = -1 + column_outermargin + column_innermargin / 2
-                col_index = 0
-                while i < 1 - column_outermargin:
+                _range_start = i
+                _range_end = i + colwidth
 
-                    _range_start = i
-                    _range_end = i + colwidth
+                # Gear column checkerboard display
+                canvas.coords(gear_columns[col_index], l_thumb_pos[0] + (_range_start) * display_radius,
+                              l_thumb_pos[1] - display_radius,
+                              l_thumb_pos[0] + (_range_end) * display_radius,
+                              l_thumb_pos[1] + display_radius)
 
-                    # Gear column checkerboard display
-                    canvas.coords(gear_columns[col_index], l_thumb_pos[0] + (_range_start) * display_radius,
-                                  l_thumb_pos[1] - display_radius,
-                                  l_thumb_pos[0] + (_range_end) * display_radius,
-                                  l_thumb_pos[1] + display_radius)
+                if not stick_in_deadzone(stick_pos_x, stick_pos_y):
+                    if _range_start < stick_pos_x < _range_end:
 
-                    if not stick_in_deadzone(stick_pos_x, stick_pos_y):
-                        if _range_start < stick_pos_x < _range_end:
+                        row_offset = colcount if stick_pos_y < 0 else 0
+                        key_candidate = selected_keys[col_index + row_offset]
 
-                            row_offset = cur_colcount if stick_pos_y < 0 else 0
-                            key_candidate = selected_keys[col_index + row_offset]
+                        if key_candidate[0] != "":
+                            gear_selected = key_candidate
+                            canvas.itemconfig(cur_gear_display, text=gear_selected[0])
 
-                            if key_candidate[0] != "":
-                                gear_selected = key_candidate
-                                canvas.itemconfig(cur_gear_display, text=gear_selected[0])
+                i += colwidth + column_innermargin
+                col_index += 1
 
-                    i += colwidth + column_innermargin
-                    col_index += 1
+        # Press and unpress keys
+        for kc in keys:
+            for k in kc:
+                if gear_selected != -1 and k[1] == gear_selected[1]:
+                    # Start pressing keys
+                    if k[1] not in gear_controller.keys_currently_pressed:
 
+                        pyautogui.keyDown(k[1])
+                        # print("started pressing", k[1])
+                        gear_controller.keys_currently_pressed.append(k[1])
+                        # Vibrate
+                        if vibration_enabled:
+                            XInput.set_vibration(gear_controller_index, vibration_strength[0], vibration_strength[1])
+                            gear_controller.vibration_countdown = time.time()
+                else:
+                    # Stop pressing keys (if pressed)
+                    if k[1] in gear_controller.keys_currently_pressed:
+                        pyautogui.keyUp(k[1])
+                        # print("stopped pressing", k[1])
+                        gear_controller.keys_currently_pressed.remove(k[1])
 
-            # Press and unpress keys
-            for kc in keys:
-                for k in kc:
-                    if gear_selected != -1 and k[1] == gear_selected[1]:
-                        # Start pressing keys
-                        if k[1] not in c.keys_currently_pressed:
+        # Display pressed key
+        canvas.itemconfig(keys_pressed_display,
+                          text="Pressed: " + " ".join(gear_controller.keys_currently_pressed) if len(
+                              gear_controller.keys_currently_pressed) > 0 else "No key pressed"
+                          )
 
-                            pyautogui.keyDown(k[1])
-                            # print("started pressing", k[1])
-                            c.keys_currently_pressed.append(k[1])
-                            # Vibrate
-                            if vibration_enabled:
-                                XInput.set_vibration(c_index, vibration_strength[0], vibration_strength[1])
-                                c.vibration_countdown = time.time()
-                    else:
-                        # Stop pressing keys (if pressed)
-                        if k[1] in c.keys_currently_pressed:
-
-                            pyautogui.keyUp(k[1])
-                            # print("stopped pressing", k[1])
-                            c.keys_currently_pressed.remove(k[1])
-
-            # Display pressed key
-            canvas.itemconfig(keys_pressed_display,
-                text="Pressed: " + " ".join(c.keys_currently_pressed) if len(c.keys_currently_pressed) > 0 else "No key pressed"
-            )
-
-            # Stop vibration
-            if c.vibration_countdown != -1 and time.time() - c.vibration_countdown > vibration_length:
-                XInput.set_vibration(c_index, 0.0, 0.0)
-                c.vibration_countdown = -1
-
-        c_index += 1
+        # Stop vibration
+        if gear_controller.vibration_countdown != -1 and time.time() - gear_controller.vibration_countdown > vibration_length:
+            XInput.set_vibration(gear_controller_index, 0.0, 0.0)
+            gear_controller.vibration_countdown = -1
 
     try:
         root.update()
