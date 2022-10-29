@@ -33,7 +33,7 @@ column_outermargin = 0.10
 column_innermargin = 0.05
 
 # Gear modes
-starting_gear_mode = 4
+gear_mode = 4
 gear_modes = [
     (
         "0 Gears",  # Name
@@ -141,24 +141,61 @@ except ImportError:
 import math
 import time
 
+import sys
+import os
+
 
 # Functions
 def stick_in_deadzone(stick_x, stick_y):
     global vertical_deadzone
     global radial_deadzone
+
     return not (stick_y > vertical_deadzone or stick_y < -vertical_deadzone)\
         or math.dist((0, 0), (stick_x, stick_y)) <= radial_deadzone
+
+def cycle_gear_mode(_dir):
+    global gear_mode
+
+    gear_mode += _dir
+    if gear_mode > (len(gear_modes) - 1):
+        gear_mode = 1
+    if gear_mode < 1:
+        gear_mode = (len(gear_modes) - 1)
+
+def toggle_gear_layer():
+    controller.alt_gears = not controller.alt_gears
+
+def toggle_vibration(button):
+    global vibration_enabled
+
+    vibration_enabled = not vibration_enabled
+    button.config(text="Vibration: " + ("ON" if vibration_enabled else "OFF"))
+
+# This function can get temp path for your resource file
+# relative_path is your icon file name
+# https://stackoverflow.com/questions/71006377/tkinter-icon-is-not-working-after-converting-to-exe
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 
 # Prepare canvas
 root = tk.Tk()
 root.title("HStickShift")
+root.iconbitmap(resource_path("icon.ico"))
 canvas = tk.Canvas(root, width=canvas_dimensions[0], height=canvas_dimensions[1], bg=background_color)
 canvas.pack()
 
 
-# Variable that makes it so that only one controller can have gear functionality
+# Gear controller variables
 gears_enabled_global = False
+gear_controller = -1
 
 
 # Display
@@ -206,7 +243,7 @@ cur_gear_display = canvas.create_text(
 
 colcount_display = canvas.create_text(
     l_thumb_pos[0], l_thumb_pos[1] - display_radius * 1.5, fill=text_color,
-    text="Press Start", font=text_font
+    text="Press LS / Start", font=text_font
 )
 keys_pressed_display = canvas.create_text(
     l_thumb_pos[0], l_thumb_pos[1] + display_radius * 1.5, fill=text_color,
@@ -221,7 +258,6 @@ class Controller:
         self.gears_enabled = False
         self.alt_gears = False
         self.keys_currently_pressed = []
-        self.gear_mode = starting_gear_mode
         self.vibration_countdown = -1
 
 
@@ -235,9 +271,13 @@ controllers = (
 
 # Main loop
 while 1:
+
+    # Handle XInput events
     events = get_events()
     for event in events:
+
         controller = controllers[event.user_index]
+
         if event.type == EVENT_CONNECTED:
             print("Controller", event.user_index, "connected.")
 
@@ -258,18 +298,38 @@ while 1:
 
         elif event.type == EVENT_BUTTON_PRESSED:
             if event.button in ("DPAD_LEFT", "LEFT_SHOULDER"):
-                controller.gear_mode -= 1
-                controller.gear_mode = max(controller.gear_mode, 1)
+                cycle_gear_mode(-1)
             elif event.button in ("DPAD_RIGHT", "RIGHT_SHOULDER"):
-                controller.gear_mode += 1
-                controller.gear_mode = min(controller.gear_mode, len(gear_modes) - 1)
+                cycle_gear_mode(1)
             elif event.button in ("START", "LEFT_THUMB"):
                 if not gears_enabled_global:
+
+                    # Enable gear functionality
                     controller.gears_enabled = True
                     gears_enabled_global = True
-                else:
-                    controller.alt_gears = not controller.alt_gears
+                    gear_controller = controller
 
+                    # Create buttons
+                    widget = tk.Button(None, text='Previous Mode (LB)')
+                    widget.bind('<Button-1>', lambda e: cycle_gear_mode(-1))
+                    widget.pack(in_=None, side=tk.LEFT)
+
+                    widget2 = tk.Button(None, text='Next Mode (RB)')
+                    widget2.bind('<Button-1>', lambda e: cycle_gear_mode(1))
+                    widget2.pack(in_=None, side=tk.LEFT)
+
+                    widget2 = tk.Button(None, text='Switch Layer (LS)')
+                    widget2.bind('<Button-1>', lambda e: toggle_gear_layer())
+                    widget2.pack(in_=None, side=tk.LEFT)
+
+                    widget3 = tk.Button(None, text="Vibration: " + ("ON" if vibration_enabled else "OFF"))
+                    widget3.bind('<Button-1>', lambda e: toggle_vibration(widget3))
+                    widget3.pack(in_=None, side=tk.RIGHT)
+
+                else:
+                    toggle_gear_layer()
+
+    # Gear logic
     c_index = 0
     for c in controllers:
         if c.gears_enabled:
@@ -280,17 +340,17 @@ while 1:
             stick_pos_y = XInput.get_thumb_values(state)[0][1]
 
             # Choose gear set
-            keys = gear_modes[c.gear_mode][2]
-            cur_colcount = gear_modes[c.gear_mode][1]
+            keys = gear_modes[gear_mode][2]
+            cur_colcount = gear_modes[gear_mode][1]
 
             colwidth = (2 - 2 * column_outermargin) / cur_colcount - column_innermargin
 
             canvas.itemconfig(cur_gear_display, text="N")
 
-            canvas.itemconfig(colcount_display, text="< " + gear_modes[c.gear_mode][0] + " >")
+            canvas.itemconfig(colcount_display, text="< " + gear_modes[gear_mode][0] + " >")
 
             # Choose key set
-            selected_keys = keys[c.alt_gears if len(gear_modes[c.gear_mode][2]) > 1 else 0]
+            selected_keys = keys[c.alt_gears if len(gear_modes[gear_mode][2]) > 1 else 0]
 
             # Visual gear display
             txt = ""
@@ -361,7 +421,9 @@ while 1:
                             c.keys_currently_pressed.remove(k[1])
 
             # Display pressed key
-            canvas.itemconfig(keys_pressed_display, text="Pressed: " + " ".join(c.keys_currently_pressed) if len(c.keys_currently_pressed) > 0 else "")
+            canvas.itemconfig(keys_pressed_display,
+                text="Pressed: " + " ".join(c.keys_currently_pressed) if len(c.keys_currently_pressed) > 0 else "No key pressed"
+            )
 
             # Stop vibration
             if c.vibration_countdown != -1 and time.time() - c.vibration_countdown > vibration_length:
