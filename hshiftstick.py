@@ -1,43 +1,114 @@
+# Imports
+import XInput
+from XInput import *
+
+import pyautogui
+pyautogui.PAUSE = 0
+pyautogui.FAILSAFE = False
+
+try:
+    import tkinter as tk
+except ImportError:
+    import Tkinter as tk
+
+import math
+import time
+
+import sys
+import os
+
+
+# Functions
+def stick_in_deadzone(stick_x, stick_y):
+    global vertical_deadzone
+    global radial_deadzone
+
+    return not (stick_y > vertical_deadzone or stick_y < -vertical_deadzone)\
+        or math.dist((0, 0), (stick_x, stick_y)) <= radial_deadzone
+
+def cycle_gear_mode(_dir):
+    global gear_mode
+
+    gear_mode += _dir
+    if gear_mode > (len(gear_modes) - 1):
+        gear_mode = 1
+    if gear_mode < 1:
+        gear_mode = (len(gear_modes) - 1)
+
+def toggle_gear_layer():
+    controller.alt_gears = not controller.alt_gears
+
+def toggle_vibration(button):
+    global vibration_enabled
+
+    vibration_enabled = not vibration_enabled
+    button.config(text="Vibration: " + ("ON" if vibration_enabled else "OFF"))
+
+def select_button(widget):
+    widget['bg'] = 'green'
+    widget['activebackground'] = 'green'
+    widget['relief'] = 'sunken'
+
+    previously_clicked = widget
+
+# This function can get temp path for your resource file
+# relative_path is your icon file name
+# https://stackoverflow.com/questions/71006377/tkinter-icon-is-not-working-after-converting-to-exe
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+
 # START CONFIG ---------------------------------------------------------------------------------------------------------
 
-# Color config
-background_color = "#313335"
-window_background_color = "#2b2b2b"
+from configparser import ConfigParser
+config = ConfigParser()
 
-column_checkerboard_color = "#3c3f41"
-column_checkerboard_color_alt = "#2b2b2b"
 
-text_color = "white"
-gear_selected_text = "yellow"
+if os.path.exists(resource_path("config.ini")):
+    config.read('config.ini')
+else:
+    config.read('config.ini')
+    config.add_section('main')
 
-vertical_deadzone_color = "#52503a"
-radial_deadzone_color = "#52503a"
+    config.set("main", "cpu_cycle_limit", "0.05") # If over 0, introduces a sleep time (in seconds) inbetween loop cycles
 
-# Size config
-display_scale = 2
-canvas_dimensions = (260 * display_scale, 200 * display_scale)
-display_radius = 50 * display_scale
-stick_display_radius = 10 * display_scale
-outline_width = 2 * display_scale
-margin = 10 * display_scale
-font_size = 12 * display_scale
-text_font = ("Consolas Bold", font_size)
-button_padding = 6 * display_scale
-button_font = ("Consolas", 4 * display_scale)
+    config.set("main", "vibration_enabled", "1")
 
-# Controller config
-vibration_enabled = True
-vibration_length = 0.15
-vibration_strength = (1.0, 0.5)
+    config.set("main", "vertical_deadzone", '0.3')
+    config.set("main", "radial_deadzone", "0.6")
 
-vertical_deadzone = 0.3
-radial_deadzone = 0.6
+    config.set("main", "column_outermargin", "0.1")
+    config.set("main", "column_innermargin", "0.05")
 
-column_outermargin = 0.10
-column_innermargin = 0.05
+    config.set("main", "gear_mode", "4")
+
+    config.set("main", "display_scale", "2")
+
+    with open('config.ini', 'w') as f:
+        config.write(f)
+
+cpu_cycle_limit = float(config.get("main", "cpu_cycle_limit"))
+
+vibration_enabled = bool(config.get("main", "vibration_enabled"))
+
+vertical_deadzone = float(config.get("main", "vertical_deadzone"))
+radial_deadzone = float(config.get("main", "radial_deadzone"))
+
+column_outermargin = float(config.get("main", "column_outermargin"))
+column_innermargin = float(config.get("main", "column_innermargin"))
+
+gear_mode = int(config.get("main", "gear_mode"))
+
+display_scale = int(config.get("main", "display_scale"))
 
 # Gear modes
-gear_mode = 4
 gear_modes = [
     (
         "0 Gears",  # Name
@@ -129,71 +200,33 @@ gear_modes = [
 # END CONFIG -----------------------------------------------------------------------------------------------------------
 
 
-# Imports
-import XInput
-from XInput import *
+# Color config
+background_color = "#313335"
+window_background_color = "#2b2b2b"
 
-import pyautogui
-pyautogui.PAUSE = 0
-pyautogui.FAILSAFE = False
+column_checkerboard_color = "#3c3f41"
+column_checkerboard_color_alt = "#2b2b2b"
 
-try:
-    import tkinter as tk
-except ImportError:
-    import Tkinter as tk
+text_color = "white"
+gear_selected_text = "yellow"
 
-import math
-import time
+vertical_deadzone_color = "#52503a"
+radial_deadzone_color = "#52503a"
 
-import sys
-import os
+# Size config
+canvas_dimensions = (260 * display_scale, 200 * display_scale)
+display_radius = 50 * display_scale
+stick_display_radius = 10 * display_scale
+outline_width = 2 * display_scale
+margin = 10 * display_scale
+font_size = 12 * display_scale
+text_font = ("Consolas Bold", font_size)
+button_padding = 6 * display_scale
+button_font = ("Consolas", 4 * display_scale)
 
-
-# Functions
-def stick_in_deadzone(stick_x, stick_y):
-    global vertical_deadzone
-    global radial_deadzone
-
-    return not (stick_y > vertical_deadzone or stick_y < -vertical_deadzone)\
-        or math.dist((0, 0), (stick_x, stick_y)) <= radial_deadzone
-
-def cycle_gear_mode(_dir):
-    global gear_mode
-
-    gear_mode += _dir
-    if gear_mode > (len(gear_modes) - 1):
-        gear_mode = 1
-    if gear_mode < 1:
-        gear_mode = (len(gear_modes) - 1)
-
-def toggle_gear_layer():
-    controller.alt_gears = not controller.alt_gears
-
-def toggle_vibration(button):
-    global vibration_enabled
-
-    vibration_enabled = not vibration_enabled
-    button.config(text="Vibration: " + ("ON" if vibration_enabled else "OFF"))
-
-def select_button(widget):
-    widget['bg'] = 'green'
-    widget['activebackground'] = 'green'
-    widget['relief'] = 'sunken'
-
-    previously_clicked = widget
-
-# This function can get temp path for your resource file
-# relative_path is your icon file name
-# https://stackoverflow.com/questions/71006377/tkinter-icon-is-not-working-after-converting-to-exe
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
+# Vibration
+vibration_length = 0.15
+vibration_strength = (1.0, 0.5)
 
 
 # Prepare canvas
@@ -223,13 +256,8 @@ for i in range(10):
     gear_columns.append(canvas.create_rectangle(0, 0, 0, 0, width=0,
         fill=column_checkerboard_color if i % 2 == 0 else column_checkerboard_color_alt
     ))
-# Big circle to mask checkerboard
-canvas.create_oval(
-    l_thumb_pos[0] - display_radius * 2, l_thumb_pos[1] - display_radius * 2,
-    l_thumb_pos[0] + display_radius * 2, l_thumb_pos[1] + display_radius * 2,
-    width=display_radius * 2, outline=background_color
-)
 
+# Deadzones
 canvas_vertical_deadzone = canvas.create_rectangle(
     l_thumb_pos[0] - display_radius, l_thumb_pos[1] - vertical_deadzone * display_radius,
     l_thumb_pos[0] + display_radius, l_thumb_pos[1] + vertical_deadzone * display_radius,
@@ -239,6 +267,13 @@ canvas_radial_deadzone = canvas.create_oval(
     l_thumb_pos[0] - display_radius * radial_deadzone, l_thumb_pos[1] - display_radius * radial_deadzone,
     l_thumb_pos[0] + display_radius * radial_deadzone, l_thumb_pos[1] + display_radius * radial_deadzone,
     width=0, fill=radial_deadzone_color
+)
+
+# Big circle to mask checkerboard and deadzone
+canvas.create_oval(
+    l_thumb_pos[0] - display_radius * 2, l_thumb_pos[1] - display_radius * 2,
+    l_thumb_pos[0] + display_radius * 2, l_thumb_pos[1] + display_radius * 2,
+    width=display_radius * 2, outline=background_color
 )
 
 l_thumb_outline = canvas.create_oval(
@@ -416,7 +451,7 @@ while 1:
                               l_thumb_pos[1] + display_radius)
 
                 if not stick_in_deadzone(stick_pos_x, stick_pos_y):
-                    if _range_start < stick_pos_x < _range_end:
+                    if _range_start < stick_pos_x <= _range_end:
 
                         row_offset = colcount if stick_pos_y < 0 else 0
                         key_candidate = selected_keys[col_index + row_offset]
@@ -464,3 +499,6 @@ while 1:
         root.update()
     except tk.TclError:
         break
+
+    if cpu_cycle_limit > 0:
+        time.sleep(cpu_cycle_limit)
