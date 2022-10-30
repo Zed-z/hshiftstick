@@ -10,6 +10,7 @@ try:
     import tkinter as tk
 except ImportError:
     import Tkinter as tk
+import tkinter.messagebox
 
 import math
 import time
@@ -30,15 +31,18 @@ def stick_in_deadzone(stick_x, stick_y):
         or math.dist((0, 0), (stick_x, stick_y)) <= radial_deadzone
 
 def cycle_gear_mode(_dir):
-    global gear_mode
+    if gears_enabled_global:
+        global gear_mode
 
-    gear_mode += _dir
-    if gear_mode > (len(gear_modes) - 1):
-        gear_mode = 1
-    if gear_mode < 1:
-        gear_mode = (len(gear_modes) - 1)
+        gear_mode += _dir
+        if gear_mode > (len(gear_modes) - 1):
+            gear_mode = 1
+        if gear_mode < 1:
+            gear_mode = (len(gear_modes) - 1)
 
-    update_gear_display()
+        update_gear_display()
+    else:
+        tk.messagebox.showwarning(title="Function Unavailable!", message="Controller not enabled!")
 
 def toggle_gear_layer(controller):
     controller.alt_gears = not controller.alt_gears
@@ -56,10 +60,24 @@ def update_gear_display():
     global l_thumb_pos
     global display_radius
 
+    global gear_zones
+    gear_zones = []
+
     keys = gear_modes[gear_mode][2]
     selected_keys = keys[gear_controller.alt_gears if len(gear_modes[gear_mode][2]) > 1 else 0]
+
     colcount = gear_modes[gear_mode][1]
-    colwidth = (2 - 2 * column_outermargin) / colcount - column_innermargin
+
+    _innerarea = 2 - 2 * column_outermargin
+    if colcount == 1:
+        colwidth = _innerarea
+    elif colcount == 2:
+        colwidth = (_innerarea - column_innermargin) / colcount
+    elif colcount == 3:
+        colwidth = (_innerarea - column_innermargin_outer * 2) / colcount
+    else:
+        colwidth = (_innerarea - column_innermargin_outer * 2 - column_innermargin * (colcount - 1 - 2)) / colcount
+
 
     # Gear column checkerboard display
     for i in range(len(gear_columns)):
@@ -71,9 +89,10 @@ def update_gear_display():
     for row in range(2):
         second_column = row > 0
 
-        i = -1 + column_outermargin + column_innermargin / 2
+        i = -1 + column_outermargin
         col_index = 0 + (second_column * colcount)
-        while i < 1 - column_outermargin:
+
+        while col_index < len(selected_keys):
 
             _range_start = i
             _range_end = i + colwidth
@@ -82,14 +101,23 @@ def update_gear_display():
             # Gear column checkerboard display
             canvas.coords(
                 gear_columns[col_index][0],
-                l_thumb_pos[0] + (_range_start) * display_radius,
+                l_thumb_pos[0] + _range_start * display_radius,
                 l_thumb_pos[1] - display_radius * int(not second_column),
-                l_thumb_pos[0] + (_range_end) * display_radius,
+                l_thumb_pos[0] + _range_end * display_radius,
                 l_thumb_pos[1] + display_radius * int(second_column)
             )
             canvas.itemconfig(
                 gear_columns[col_index][0],
                 fill=column_checkerboard_color if col_index % 2 == (int(second_column) * int(colcount % 2 == 0)) else column_checkerboard_color_alt
+            )
+            gear_zones.append(
+                (
+                    selected_keys[col_index],
+                    l_thumb_pos[0] + _range_start * display_radius,
+                    l_thumb_pos[1] - display_radius * int(not second_column),
+                    l_thumb_pos[0] + _range_end * display_radius,
+                    l_thumb_pos[1] + display_radius * int(second_column)
+                )
             )
 
             numoffset = math.sin((col_index % colcount) / (colcount - 1) * math.pi) if colcount > 1 else 1
@@ -107,37 +135,36 @@ def update_gear_display():
                 text=selected_keys[col_index][0]
             )
 
-            i += colwidth + column_innermargin
+            i += colwidth + (column_innermargin_outer if ((col_index % colcount) in (0, colcount - 2)) and colcount >= 3 else column_innermargin)
             col_index += 1
 
 def toggle_vibration(button):
-    global vibration_enabled
-    global button_color
-    global button_active_color
+    if gears_enabled_global:
+        global vibration_enabled
+        global button_color
+        global button_active_color
 
-    vibration_enabled = not vibration_enabled
-    button.config(
-        text="Vibration",
-        bg=(button_active_color if vibration_enabled else button_color)
-    )
+        vibration_enabled = not vibration_enabled
+        button.config(
+            text="Vibration",
+            bg=(button_active_color if vibration_enabled else button_color)
+        )
+    else:
+        tk.messagebox.showwarning(title="Function Unavailable!", message="Controller not enabled!")
 
 def toggle_key_spam_mode(button):
-    global key_spam_mode
-    global button_color
-    global button_active_color
+    if gears_enabled_global:
+        global key_spam_mode
+        global button_color
+        global button_active_color
 
-    key_spam_mode = not key_spam_mode
-    button.config(
-        text="Key Spam",
-        bg=(button_active_color if key_spam_mode else button_color)
-    )
-
-def select_button(widget):
-    widget['bg'] = 'green'
-    widget['activebackground'] = 'green'
-    widget['relief'] = 'sunken'
-
-    previously_clicked = widget
+        key_spam_mode = not key_spam_mode
+        button.config(
+            text="Key Spam",
+            bg=(button_active_color if key_spam_mode else button_color)
+        )
+    else:
+        tk.messagebox.showwarning(title="Function Unavailable!", message="Controller not enabled!")
 
 # This function can get temp path for your resource file
 # relative_path is your icon file name
@@ -163,63 +190,48 @@ if os.path.exists("config.ini"):
     config.read('config.ini')
 else:
     config.read('config.ini')
-    config.add_section('main')
 
-    config.set("main", "vibration_enabled", "1")
-
-    config.set("main", "vertical_deadzone_left", '0.3')
-    config.set("main", "vertical_deadzone_right", '0.3')
-    config.set("main", "radial_deadzone", "0.6")
-
-    config.set("main", "column_outermargin", "0.1")
-    config.set("main", "column_innermargin", "0.001")
-
+    config.add_section("main")
     config.set("main", "gear_mode", "4")
-
     config.set("main", "display_scale", "2")
-
+    config.set("main", "vibration_enabled", "1")
     config.set("main", "key_spam_mode", "0")
+
+    config.add_section("deadzone")
+    config.set("deadzone", "vertical_deadzone_left", '0.3')
+    config.set("deadzone", "vertical_deadzone_right", '0.3')
+    config.set("deadzone", "radial_deadzone", "0.6")
+
+    config.add_section("margin")
+    config.set("margin", "column_outermargin", "0.0")
+    config.set("margin", "column_innermargin", "0.0")
+    config.set("margin", "column_innermargin_outer", "0.0")
 
     with open('config.ini', 'w') as f:
         config.write(f)
 
+gear_mode = int(config.get("main", "gear_mode"))
+display_scale = int(config.get("main", "display_scale"))
 vibration_enabled = bool(config.get("main", "vibration_enabled"))
-
-vertical_deadzone_left = float(config.get("main", "vertical_deadzone_left"))
-vertical_deadzone_right = float(config.get("main", "vertical_deadzone_right"))
-radial_deadzone = float(config.get("main", "radial_deadzone"))
-
-column_outermargin = float(config.get("main", "column_outermargin"))
-column_innermargin = float(config.get("main", "column_innermargin"))
-
 key_spam_mode = float(config.get("main", "key_spam_mode"))
 
-gear_mode = int(config.get("main", "gear_mode"))
+vertical_deadzone_left = float(config.get("deadzone", "vertical_deadzone_left"))
+vertical_deadzone_right = float(config.get("deadzone", "vertical_deadzone_right"))
+radial_deadzone = float(config.get("deadzone", "radial_deadzone"))
 
-display_scale = int(config.get("main", "display_scale"))
+column_outermargin = float(config.get("margin", "column_outermargin"))
+column_innermargin = float(config.get("margin", "column_innermargin"))
+column_innermargin_outer = float(config.get("margin", "column_innermargin_outer"))
 
 # END CONFIG -----------------------------------------------------------------------------------------------------------
 
 
 # Gear modes
 from gear_modes import *
+gear_zones = []
 
 # Color config
-background_color = "#313335"
-window_background_color = "#2b2b2b"
-
-column_checkerboard_color = "#3c3f41"
-column_checkerboard_color_alt = "#2b2b2b"
-
-text_color = "white"
-gear_selected_text = "yellow"
-
-vertical_deadzone_color = "#52503a"
-radial_deadzone_color = "#52503a"
-
-button_color = "#3c3f41"
-button_active_color = "#547a51"
-button_pressed_color = "gray"
+from color_config import *
 
 # Size config
 canvas_dimensions = (260 * display_scale, 200 * display_scale)
@@ -241,6 +253,7 @@ vibration_strength = (1.0, 0.5)
 
 # Sleep time (in ms) inbetween loop cycles when not in focus
 cpu_cycle_limit = 100
+cpu_cycle_limit_key_spam = 16
 
 # Prepare canvas
 root = tk.Tk()
@@ -262,6 +275,13 @@ gear_controller_index = -1
 l_thumb_pos = (canvas_dimensions[0] / 2, canvas_dimensions[1] / 2)
 l_thumb_stick_pos = l_thumb_pos
 
+# Background
+l_thumb_outline = canvas.create_rectangle(
+    l_thumb_pos[0] - display_radius, l_thumb_pos[1] - display_radius,
+    l_thumb_pos[0] + display_radius, l_thumb_pos[1] + display_radius,
+    width=0, fill=gear_background_color
+)
+
 # Gear column checkerboard design
 gear_columns = []
 for i in range(10 * 2):
@@ -269,7 +289,6 @@ for i in range(10 * 2):
         [
             canvas.create_rectangle(
                 0, 0, 0, 0, width=0,
-                fill="black"
             )
         ]
     )
@@ -334,12 +353,40 @@ mode_display_bg = canvas.create_rectangle(
 )
 mode_display = canvas.create_text(
     l_thumb_pos[0], margin * 1.5, fill=text_color,
-    text="Press LS / Start", font=text_font
+    text="No mode selected", font=text_font
 )
 keys_pressed_display = canvas.create_text(
     l_thumb_pos[0], canvas_dimensions[1] - margin * 1.5, fill=text_color,
-    text="", font=text_font
+    text="Press LS / Start", font=text_font
 )
+
+# Create buttons
+widget = tk.Button(None, text='Prev Mode', font=button_font)
+widget.config(bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
+widget.config(activebackground=button_pressed_color, activeforeground=text_color)
+widget.bind('<Button-1>', lambda e: cycle_gear_mode(-1))
+widget.pack(in_=None, side=tk.LEFT, padx=button_margin, pady=button_margin)
+
+widget = tk.Button(None, text='Next Mode', font=button_font)
+widget.config(bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
+widget.config(activebackground=button_pressed_color, activeforeground=text_color)
+widget.bind('<Button-1>', lambda e: cycle_gear_mode(1))
+widget.pack(in_=None, side=tk.LEFT, padx=button_margin, pady=button_margin)
+
+widget = tk.Button(None, text="Vibration",
+                   font=button_font)
+widget.config(bg=(button_active_color if vibration_enabled else button_color), fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding,
+              pady=button_padding)
+widget.config(activebackground=button_pressed_color, activeforeground=text_color)
+widget.bind('<Button-1>', lambda e: toggle_vibration(widget))
+widget.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
+
+widget2 = tk.Button(None, text="Key Spam", font=button_font)
+widget2.config(bg=(button_active_color if key_spam_mode else button_color), fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding,
+              pady=button_padding)
+widget2.config(activebackground=button_pressed_color, activeforeground=text_color)
+widget2.bind('<Button-1>', lambda e: toggle_key_spam_mode(widget2))
+widget2.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
 
 
 # Prepare controllers
@@ -412,82 +459,41 @@ def my_main_loop():
                     # Update gear display
                     update_gear_display()
 
-                    # Create buttons
-                    widget = tk.Button(None, text='Prev Mode', font=button_font)
-                    widget.config(bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
-                    widget.config(activebackground=button_pressed_color, activeforeground=text_color)
-                    widget.bind('<Button-1>', lambda e: cycle_gear_mode(-1))
-                    widget.pack(in_=None, side=tk.LEFT, padx=button_margin, pady=button_margin)
-
-                    widget = tk.Button(None, text='Next Mode', font=button_font)
-                    widget.config(bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding, pady=button_padding)
-                    widget.config(activebackground=button_pressed_color, activeforeground=text_color)
-                    widget.bind('<Button-1>', lambda e: cycle_gear_mode(1))
-                    widget.pack(in_=None, side=tk.LEFT, padx=button_margin, pady=button_margin)
-
-                    widget = tk.Button(None, text="Vibration",
-                                       font=button_font)
-                    widget.config(bg=(button_active_color if vibration_enabled else button_color), fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding,
-                                  pady=button_padding)
-                    widget.config(activebackground=button_pressed_color, activeforeground=text_color)
-                    widget.bind('<Button-1>', lambda e: toggle_vibration(widget))
-                    widget.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
-
-                    widget2 = tk.Button(None, text="Key Spam", font=button_font)
-                    widget2.config(bg=(button_active_color if key_spam_mode else button_color), fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding,
-                                  pady=button_padding)
-                    widget2.config(activebackground=button_pressed_color, activeforeground=text_color)
-                    widget2.bind('<Button-1>', lambda e: toggle_key_spam_mode(widget2))
-                    widget2.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
-
                 else:
                     toggle_gear_layer(controller)
 
     # Gear logic
     if gear_controller != -1:
-        state = XInput.get_state(gear_controller_index)
 
         # Stick pos
+        state = XInput.get_state(gear_controller_index)
         stick_pos_x = XInput.get_thumb_values(state)[0][0]
         stick_pos_y = XInput.get_thumb_values(state)[0][1]
 
-        # Choose gear set
-        keys = gear_modes[gear_mode][2]
-        colcount = gear_modes[gear_mode][1]
-
-        colwidth = (2 - 2 * column_outermargin) / colcount - column_innermargin
-
         canvas.itemconfig(cur_gear_display, text="N")
-
         canvas.itemconfig(mode_display, text=gear_modes[gear_mode][0])
-
-        # Choose key set
-        selected_keys = keys[gear_controller.alt_gears if len(gear_modes[gear_mode][2]) > 1 else 0]
 
         # Select gear and change gear display
         gear_selected = -1
+        if not stick_in_deadzone(stick_pos_x, stick_pos_y):
+            for gz in gear_zones:
 
-        i = -1 + column_outermargin + column_innermargin / 2
-        col_index = 0
-        while i < 1 - column_outermargin:
+                _key = gz[0]
+                _x1 = gz[1]
+                _y1 = gz[2]
+                _x2 = gz[3]
+                _y2 = gz[4]
 
-            _range_start = i
-            _range_end = i + colwidth
+                if _x1 < (l_thumb_pos[0] + stick_pos_x * display_radius) <= _x2\
+                    and _y1 < (l_thumb_pos[1] - stick_pos_y * display_radius) < _y2:
 
-            if not stick_in_deadzone(stick_pos_x, stick_pos_y):
-                if _range_start < stick_pos_x <= _range_end:
-
-                    row_offset = colcount if stick_pos_y < 0 else 0
-                    key_candidate = selected_keys[col_index + row_offset]
-
+                    key_candidate = _key
                     if key_candidate[0] != "":
                         gear_selected = key_candidate
                         canvas.itemconfig(cur_gear_display, text=gear_selected[0])
 
-            i += colwidth + column_innermargin
-            col_index += 1
-
         # Press and unpress keys
+        keys = gear_modes[gear_mode][2]
         for kc in keys:
             for k in kc:
                 if gear_selected != -1 and k[1] == gear_selected[1]:
@@ -525,7 +531,7 @@ def my_main_loop():
             XInput.set_vibration(gear_controller_index, 0.0, 0.0)
             gear_controller.vibration_countdown = -1
 
-    root.after(1 if root.focus_displayof() else cpu_cycle_limit, my_main_loop)
+    root.after(1 if root.focus_displayof() else (cpu_cycle_limit_key_spam if key_spam_mode else cpu_cycle_limit), my_main_loop)
 
 root.after(1, my_main_loop)
 root.mainloop()
