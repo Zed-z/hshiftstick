@@ -3,8 +3,21 @@ import XInput
 from XInput import *
 
 import pyautogui
+import pydirectinput
 pyautogui.PAUSE = 0
 pyautogui.FAILSAFE = False
+pydirectinput.PAUSE = 0
+pydirectinput.FAILSAFE = False
+pydirectinput.KEYBOARD_MAPPING['num0'] = 0x52
+pydirectinput.KEYBOARD_MAPPING['num1'] = 0x4f
+pydirectinput.KEYBOARD_MAPPING['num2'] = 0x50
+pydirectinput.KEYBOARD_MAPPING['num3'] = 0x51
+pydirectinput.KEYBOARD_MAPPING['num4'] = 0x4b
+pydirectinput.KEYBOARD_MAPPING['num5'] = 0x4c
+pydirectinput.KEYBOARD_MAPPING['num6'] = 0x4d
+pydirectinput.KEYBOARD_MAPPING['num7'] = 0x47
+pydirectinput.KEYBOARD_MAPPING['num8'] = 0x48
+pydirectinput.KEYBOARD_MAPPING['num9'] = 0x49
 
 try:
     import tkinter as tk
@@ -92,7 +105,7 @@ def update_gear_display():
         i = -1 + column_outermargin
         col_index = 0 + (second_column * colcount)
 
-        while col_index < len(selected_keys):
+        while col_index < (len(selected_keys) // 2) * (2 if second_column else 1):
 
             _range_start = i
             _range_end = i + colwidth
@@ -146,11 +159,8 @@ def toggle_vibration(button):
 
         vibration_enabled = not vibration_enabled
         button.config(
-            text="Vibration",
             bg=(button_active_color if vibration_enabled else button_color)
         )
-    else:
-        tk.messagebox.showwarning(title="Function Unavailable!", message="Controller not enabled!")
 
 def toggle_key_spam_mode(button):
     if gears_enabled_global:
@@ -160,11 +170,19 @@ def toggle_key_spam_mode(button):
 
         key_spam_mode = not key_spam_mode
         button.config(
-            text="Key Spam",
             bg=(button_active_color if key_spam_mode else button_color)
         )
-    else:
-        tk.messagebox.showwarning(title="Function Unavailable!", message="Controller not enabled!")
+
+def toggle_directinput(button):
+    if gears_enabled_global:
+        global directinput
+        global button_color
+        global button_active_color
+
+        directinput = not directinput
+        button.config(
+            bg=(button_active_color if directinput else button_color)
+        )
 
 # This function can get temp path for your resource file
 # relative_path is your icon file name
@@ -178,6 +196,30 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
+
+def key_press(key):
+    if directinput:
+        pydirectinput.keyDown(key)
+    else:
+        pyautogui.keyDown(key)
+
+    # print("started pressing", key)
+
+def key_release(key):
+    if directinput:
+        pydirectinput.keyUp(key)
+    else:
+        pyautogui.keyUp(key)
+
+    # print("stopped pressing", key)
+
+def key_quick_press(key):
+    if directinput:
+        pydirectinput.press(key)
+    else:
+        pyautogui.press(key)
+
+    # print("pressed", key
 
 
 # START CONFIG ---------------------------------------------------------------------------------------------------------
@@ -195,7 +237,9 @@ else:
     config.set("main", "gear_mode", "4")
     config.set("main", "display_scale", "2")
     config.set("main", "vibration_enabled", "1")
+    config.set("main", "vibration_intensity", "1.0")
     config.set("main", "key_spam_mode", "0")
+    config.set("main", "directinput", "0")
 
     config.add_section("deadzone")
     config.set("deadzone", "vertical_deadzone_left", '0.3')
@@ -212,8 +256,10 @@ else:
 
 gear_mode = int(config.get("main", "gear_mode"))
 display_scale = int(config.get("main", "display_scale"))
-vibration_enabled = bool(config.get("main", "vibration_enabled"))
-key_spam_mode = float(config.get("main", "key_spam_mode"))
+vibration_enabled = config.getboolean("main", "vibration_enabled")
+vibration_intensity = float(config.get("main", "vibration_intensity"))
+key_spam_mode = config.getboolean("main", "key_spam_mode")
+directinput = config.getboolean("main", "directinput")
 
 vertical_deadzone_left = float(config.get("deadzone", "vertical_deadzone_left"))
 vertical_deadzone_right = float(config.get("deadzone", "vertical_deadzone_right"))
@@ -222,6 +268,26 @@ radial_deadzone = float(config.get("deadzone", "radial_deadzone"))
 column_outermargin = float(config.get("margin", "column_outermargin"))
 column_innermargin = float(config.get("margin", "column_innermargin"))
 column_innermargin_outer = float(config.get("margin", "column_innermargin_outer"))
+
+def config_save():
+
+    config.set("main", "gear_mode", str(gear_mode))
+    config.set("main", "display_scale", str(display_scale))
+    config.set("main", "vibration_enabled", str(vibration_enabled))
+    config.set("main", "vibration_intensity", str(vibration_intensity))
+    config.set("main", "key_spam_mode", str(key_spam_mode))
+    config.set("main", "directinput", str(directinput))
+
+    config.set("deadzone", "vertical_deadzone_left", str(vertical_deadzone_left))
+    config.set("deadzone", "vertical_deadzone_right", str(vertical_deadzone_right))
+    config.set("deadzone", "radial_deadzone", str(radial_deadzone))
+
+    config.set("margin", "column_outermargin", str(column_outermargin))
+    config.set("margin", "column_innermargin", str(column_innermargin))
+    config.set("margin", "column_innermargin_outer", str(column_innermargin_outer))
+
+    with open('config.ini', 'w') as f:
+        config.write(f)
 
 # END CONFIG -----------------------------------------------------------------------------------------------------------
 
@@ -249,7 +315,6 @@ gear_selected_font = ("Consolas Bold", 24 * display_scale)
 
 # Vibration
 vibration_length = 0.15
-vibration_strength = (1.0, 0.5)
 
 # Sleep time (in ms) inbetween loop cycles when not in focus
 cpu_cycle_limit = 100
@@ -257,9 +322,15 @@ cpu_cycle_limit_key_spam = 16
 
 # Prepare canvas
 root = tk.Tk()
-root.config(bg=window_background_color)
+root.config(bg=gear_background_color)
 root.title("HStickShift")
 root.iconbitmap(resource_path("icon.ico"))
+
+# Save config before closing
+def root_close():
+    config_save()
+    root.destroy()
+root.wm_protocol("WM_DELETE_WINDOW", root_close)
 
 canvas = tk.Canvas(root, width=canvas_dimensions[0], height=canvas_dimensions[1], bg=background_color)
 canvas.config(highlightthickness=0) # Remove outline
@@ -355,6 +426,11 @@ mode_display = canvas.create_text(
     l_thumb_pos[0], margin * 1.5, fill=text_color,
     text="No mode selected", font=text_font
 )
+
+keys_pressed_display_bg = canvas.create_rectangle(
+    0, canvas_dimensions[1] - margin * 3, canvas_dimensions[0], canvas_dimensions[1],
+    width=0, fill=window_background_color
+)
 keys_pressed_display = canvas.create_text(
     l_thumb_pos[0], canvas_dimensions[1] - margin * 1.5, fill=text_color,
     text="Press LS / Start", font=text_font
@@ -387,6 +463,116 @@ widget2.config(bg=(button_active_color if key_spam_mode else button_color), fg=t
 widget2.config(activebackground=button_pressed_color, activeforeground=text_color)
 widget2.bind('<Button-1>', lambda e: toggle_key_spam_mode(widget2))
 widget2.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
+
+widget3 = tk.Button(None, text="Direct Input", font=button_font)
+widget3.config(bg=(button_active_color if directinput else button_color), fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding,
+              pady=button_padding)
+widget3.config(activebackground=button_pressed_color, activeforeground=text_color)
+widget3.bind('<Button-1>', lambda e: toggle_directinput(widget3))
+widget3.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
+
+
+def change_radial_deadzone(e):
+    global radial_deadzone
+    radial_deadzone = radial_deadzone_slider.get()
+
+    canvas.coords(
+        canvas_radial_deadzone,
+        l_thumb_pos[0] - display_radius * radial_deadzone, l_thumb_pos[1] - display_radius * radial_deadzone,
+        l_thumb_pos[0] + display_radius * radial_deadzone, l_thumb_pos[1] + display_radius * radial_deadzone,
+    )
+
+radial_deadzone_slider = tk.Scale(None, from_=0.0, to=1.0, resolution=0.05, orient=tk.HORIZONTAL, digits=3, command=change_radial_deadzone)
+radial_deadzone_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=radial_deadzone_color, label="Radial Deadzone"
+)
+radial_deadzone_slider.set(radial_deadzone)
+canvas.create_window(margin * 0.5, margin * 3.5, anchor=tk.NW, window=radial_deadzone_slider)
+
+
+def change_vertical_deadzone_left(e):
+    global vertical_deadzone_left
+    vertical_deadzone_left = vertical_deadzone_left_slider.get()
+
+    canvas.coords(
+        canvas_vertical_deadzone_left,
+        l_thumb_pos[0] - display_radius, l_thumb_pos[1] - vertical_deadzone_left * display_radius,
+        l_thumb_pos[0], l_thumb_pos[1] + vertical_deadzone_left * display_radius,
+    )
+
+vertical_deadzone_left_slider = tk.Scale(None, from_=0.0, to=1.0, resolution=0.05, orient=tk.HORIZONTAL, digits=3, command=change_vertical_deadzone_left)
+vertical_deadzone_left_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=vertical_deadzone_color, label="Left Deadzone"
+)
+vertical_deadzone_left_slider.set(vertical_deadzone_left)
+canvas.create_window(margin * 0.5, margin * (3.5 + 3), anchor=tk.NW, window=vertical_deadzone_left_slider)
+
+
+def change_vertical_deadzone_right(e):
+    global vertical_deadzone_right
+    vertical_deadzone_right = vertical_deadzone_right_slider.get()
+
+    canvas.coords(
+        canvas_vertical_deadzone_right,
+        l_thumb_pos[0], l_thumb_pos[1] - vertical_deadzone_right * display_radius,
+                        l_thumb_pos[0] + display_radius, l_thumb_pos[1] + vertical_deadzone_right * display_radius,
+    )
+
+vertical_deadzone_right_slider = tk.Scale(None, from_=0.0, to=1.0, resolution=0.05, orient=tk.HORIZONTAL, digits=3, command=change_vertical_deadzone_right)
+vertical_deadzone_right_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=vertical_deadzone_color, label="Right Deadzone"
+)
+vertical_deadzone_right_slider.set(vertical_deadzone_right)
+canvas.create_window(margin * 0.5, margin * (3.5 + 6), anchor=tk.NW, window=vertical_deadzone_right_slider)
+
+
+def change_vibration_intensity(e):
+    global vibration_intensity
+    vibration_intensity = vibration_intensity_slider.get()
+
+vibration_intensity_slider = tk.Scale(None, from_=0.0, to=1.0, resolution=0.05, orient=tk.HORIZONTAL, digits=3, command=change_vibration_intensity)
+vibration_intensity_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=button_active_color, label="Vibration Intensity"
+)
+vibration_intensity_slider.set(vibration_intensity)
+canvas.create_window(canvas_dimensions[0] - margin * 0.5, margin * (3.5), anchor=tk.NE, window=vibration_intensity_slider)
+
+
+def change_column_outermargin(e):
+    global column_outermargin
+    column_outermargin = column_outermargin_slider.get()
+    update_gear_display()
+
+column_outermargin_slider = tk.Scale(None, from_=0.0, to=1.0, resolution=0.05, orient=tk.HORIZONTAL, digits=3, command=change_column_outermargin)
+column_outermargin_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=gear_background_color, label="Outer Margin"
+)
+column_outermargin_slider.set(column_outermargin)
+canvas.create_window(canvas_dimensions[0] - margin * 0.5, canvas_dimensions[1] - margin * (3.5 + 6), anchor=tk.SE, window=column_outermargin_slider)
+
+def change_column_innermargin(e):
+    global column_innermargin
+    column_innermargin = column_innermargin_slider.get()
+    update_gear_display()
+
+column_innermargin_slider = tk.Scale(None, from_=0.0, to=1.0, resolution=0.05, orient=tk.HORIZONTAL, digits=3, command=change_column_innermargin)
+column_innermargin_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=gear_background_color, label="Inner Margin"
+)
+column_innermargin_slider.set(column_innermargin)
+canvas.create_window(canvas_dimensions[0] - margin * 0.5, canvas_dimensions[1] - margin * (3.5 + 3), anchor=tk.SE, window=column_innermargin_slider)
+
+def change_column_innermargin_outer(e):
+    global column_innermargin_outer
+    column_innermargin_outer = column_innermargin_outer_slider.get()
+    update_gear_display()
+
+column_innermargin_outer_slider = tk.Scale(None, from_=0.0, to=1.0, resolution=0.05, orient=tk.HORIZONTAL, digits=3, command=change_column_innermargin_outer)
+column_innermargin_outer_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=gear_background_color, label="Inouter Margin"
+)
+column_innermargin_outer_slider.set(column_innermargin_outer)
+canvas.create_window(canvas_dimensions[0] - margin * 0.5, canvas_dimensions[1] - margin * (3.5 + 0), anchor=tk.SE, window=column_innermargin_outer_slider)
 
 
 # Prepare controllers
@@ -501,23 +687,20 @@ def my_main_loop():
                     if k[1] not in gear_controller.keys_currently_pressed:
 
                         if not key_spam_mode:
-                            pyautogui.keyDown(k[1])
-                            # print("started pressing", k[1])
+                            key_press(k[1])
                         gear_controller.keys_currently_pressed.append(k[1])
 
                         # Vibrate
                         if vibration_enabled:
-                            XInput.set_vibration(gear_controller_index, vibration_strength[0], vibration_strength[1])
+                            XInput.set_vibration(gear_controller_index, vibration_intensity, vibration_intensity)
                             gear_controller.vibration_countdown = time.time()
                     if key_spam_mode:
-                        pyautogui.keyDown(k[1])
-                        # print("pressed", k[1])
+                        key_quick_press(k[1])
                 else:
                     # Stop pressing keys (if pressed)
                     if k[1] in gear_controller.keys_currently_pressed:
                         if not key_spam_mode:
-                            pyautogui.keyUp(k[1])
-                            # print("stopped pressing", k[1])
+                            key_release(k[1])
                         gear_controller.keys_currently_pressed.remove(k[1])
 
         # Display pressed key
