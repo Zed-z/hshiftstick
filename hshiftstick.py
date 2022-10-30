@@ -40,7 +40,7 @@ def cycle_gear_mode(_dir):
 
     update_gear_display()
 
-def toggle_gear_layer():
+def toggle_gear_layer(controller):
     controller.alt_gears = not controller.alt_gears
 
     update_gear_display()
@@ -239,8 +239,8 @@ gear_selected_font = ("Consolas Bold", 24 * display_scale)
 vibration_length = 0.15
 vibration_strength = (1.0, 0.5)
 
-# If over 0, introduces a sleep time (in seconds) inbetween loop cycles when not in focus
-cpu_cycle_limit = 0.1
+# Sleep time (in ms) inbetween loop cycles when not in focus
+cpu_cycle_limit = 100
 
 # Prepare canvas
 root = tk.Tk()
@@ -251,7 +251,6 @@ root.iconbitmap(resource_path("icon.ico"))
 canvas = tk.Canvas(root, width=canvas_dimensions[0], height=canvas_dimensions[1], bg=background_color)
 canvas.config(highlightthickness=0) # Remove outline
 canvas.pack()
-
 
 # Gear controller variables
 gears_enabled_global = False
@@ -362,7 +361,11 @@ controllers = (
 
 
 # Main loop
-while 1:
+def my_main_loop():
+
+    global gear_controller
+    global gears_enabled_global
+    global gear_controller_index
 
     # Handle XInput events
     events = get_events()
@@ -438,7 +441,7 @@ while 1:
                     widget2.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
 
                 else:
-                    toggle_gear_layer()
+                    toggle_gear_layer(controller)
 
     # Gear logic
     if gear_controller != -1:
@@ -464,26 +467,25 @@ while 1:
         # Select gear and change gear display
         gear_selected = -1
 
-        if True:
-            i = -1 + column_outermargin + column_innermargin / 2
-            col_index = 0
-            while i < 1 - column_outermargin:
+        i = -1 + column_outermargin + column_innermargin / 2
+        col_index = 0
+        while i < 1 - column_outermargin:
 
-                _range_start = i
-                _range_end = i + colwidth
+            _range_start = i
+            _range_end = i + colwidth
 
-                if not stick_in_deadzone(stick_pos_x, stick_pos_y):
-                    if _range_start < stick_pos_x <= _range_end:
+            if not stick_in_deadzone(stick_pos_x, stick_pos_y):
+                if _range_start < stick_pos_x <= _range_end:
 
-                        row_offset = colcount if stick_pos_y < 0 else 0
-                        key_candidate = selected_keys[col_index + row_offset]
+                    row_offset = colcount if stick_pos_y < 0 else 0
+                    key_candidate = selected_keys[col_index + row_offset]
 
-                        if key_candidate[0] != "":
-                            gear_selected = key_candidate
-                            canvas.itemconfig(cur_gear_display, text=gear_selected[0])
+                    if key_candidate[0] != "":
+                        gear_selected = key_candidate
+                        canvas.itemconfig(cur_gear_display, text=gear_selected[0])
 
-                i += colwidth + column_innermargin
-                col_index += 1
+            i += colwidth + column_innermargin
+            col_index += 1
 
         # Press and unpress keys
         for kc in keys:
@@ -523,10 +525,7 @@ while 1:
             XInput.set_vibration(gear_controller_index, 0.0, 0.0)
             gear_controller.vibration_countdown = -1
 
-    try:
-        root.update()
-    except tk.TclError:
-        break
+    root.after(1 if root.focus_displayof() else cpu_cycle_limit, my_main_loop)
 
-    if not root.focus_displayof() and cpu_cycle_limit > 0:
-        time.sleep(cpu_cycle_limit)
+root.after(1, my_main_loop)
+root.mainloop()
