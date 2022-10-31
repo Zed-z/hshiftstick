@@ -44,18 +44,15 @@ def stick_in_deadzone(stick_x, stick_y):
         or math.dist((0, 0), (stick_x, stick_y)) <= radial_deadzone
 
 def cycle_gear_mode(_dir):
-    if gears_enabled_global:
-        global gear_mode
+    global gear_mode
 
-        gear_mode += _dir
-        if gear_mode > (len(gear_modes) - 1):
-            gear_mode = 1
-        if gear_mode < 1:
-            gear_mode = (len(gear_modes) - 1)
+    gear_mode += _dir
+    if gear_mode > (len(gear_modes) - 1):
+        gear_mode = 1
+    if gear_mode < 1:
+        gear_mode = (len(gear_modes) - 1)
 
-        update_gear_display()
-    else:
-        tk.messagebox.showwarning(title="Function Unavailable!", message="Controller not enabled!")
+    update_gear_display()
 
 def toggle_gear_layer(controller):
     controller.alt_gears = not controller.alt_gears
@@ -73,11 +70,17 @@ def update_gear_display():
     global l_thumb_pos
     global display_radius
 
+    # Update mode title
+    canvas.itemconfig(mode_display, text="Mode: " + gear_modes[gear_mode][0])
+
     global gear_zones
     gear_zones = []
 
     keys = gear_modes[gear_mode][2]
-    selected_keys = keys[gear_controller.alt_gears if len(gear_modes[gear_mode][2]) > 1 else 0]
+    if gear_controller != -1:
+        selected_keys = keys[gear_controller.alt_gears if len(gear_modes[gear_mode][2]) > 1 else 0]
+    else:
+        selected_keys = keys[0]
 
     colcount = gear_modes[gear_mode][1]
 
@@ -152,37 +155,34 @@ def update_gear_display():
             col_index += 1
 
 def toggle_vibration(button):
-    if gears_enabled_global:
-        global vibration_enabled
-        global button_color
-        global button_active_color
+    global vibration_enabled
+    global button_color
+    global button_active_color
 
-        vibration_enabled = not vibration_enabled
-        button.config(
-            bg=(button_active_color if vibration_enabled else button_color)
-        )
+    vibration_enabled = not vibration_enabled
+    button.config(
+        bg=(button_active_color if vibration_enabled else button_color)
+    )
 
 def toggle_key_spam_mode(button):
-    if gears_enabled_global:
-        global key_spam_mode
-        global button_color
-        global button_active_color
+    global key_spam_mode
+    global button_color
+    global button_active_color
 
-        key_spam_mode = not key_spam_mode
-        button.config(
-            bg=(button_active_color if key_spam_mode else button_color)
-        )
+    key_spam_mode = not key_spam_mode
+    button.config(
+        bg=(button_active_color if key_spam_mode else button_color)
+    )
 
 def toggle_directinput(button):
-    if gears_enabled_global:
-        global directinput
-        global button_color
-        global button_active_color
+    global directinput
+    global button_color
+    global button_active_color
 
-        directinput = not directinput
-        button.config(
-            bg=(button_active_color if directinput else button_color)
-        )
+    directinput = not directinput
+    button.config(
+        bg=(button_active_color if directinput else button_color)
+    )
 
 # This function can get temp path for your resource file
 # relative_path is your icon file name
@@ -237,7 +237,7 @@ else:
     config.set("main", "gear_mode", "4")
     config.set("main", "display_scale", "2")
     config.set("main", "vibration_enabled", "1")
-    config.set("main", "vibration_intensity", "1.0")
+    config.set("main", "vibration_intensity", "0.5")
     config.set("main", "key_spam_mode", "0")
     config.set("main", "directinput", "0")
 
@@ -250,6 +250,8 @@ else:
     config.set("margin", "column_outermargin", "0.0")
     config.set("margin", "column_innermargin", "0.0")
     config.set("margin", "column_innermargin_outer", "0.0")
+
+    config.set("main", "cpu_cycle_sleep", "100")
 
     with open('config.ini', 'w') as f:
         config.write(f)
@@ -269,6 +271,9 @@ column_outermargin = float(config.get("margin", "column_outermargin"))
 column_innermargin = float(config.get("margin", "column_innermargin"))
 column_innermargin_outer = float(config.get("margin", "column_innermargin_outer"))
 
+# Sleep time (in ms) inbetween loop cycles when not in focus
+cpu_cycle_sleep = int(config.get("main", "cpu_cycle_sleep"))
+
 def config_save():
 
     config.set("main", "gear_mode", str(gear_mode))
@@ -285,6 +290,8 @@ def config_save():
     config.set("margin", "column_outermargin", str(column_outermargin))
     config.set("margin", "column_innermargin", str(column_innermargin))
     config.set("margin", "column_innermargin_outer", str(column_innermargin_outer))
+
+    config.set("main", "cpu_cycle_sleep", str(cpu_cycle_sleep))
 
     with open('config.ini', 'w') as f:
         config.write(f)
@@ -315,10 +322,6 @@ gear_selected_font = ("Consolas Bold", 24 * display_scale)
 
 # Vibration
 vibration_length = 0.15
-
-# Sleep time (in ms) inbetween loop cycles when not in focus
-cpu_cycle_limit = 100
-cpu_cycle_limit_key_spam = 16
 
 # Prepare canvas
 root = tk.Tk()
@@ -405,16 +408,15 @@ l_thumb_outline = canvas.create_oval(
 
 cur_gear_display = canvas.create_text(
     l_thumb_pos[0], l_thumb_pos[1], fill=gear_selected_text,
-    text="", font=gear_selected_font
+    text="N", font=gear_selected_font
 )
 
 l_thumb_stick = canvas.create_oval(
-    l_thumb_stick_pos[0] - stick_display_radius, l_thumb_stick_pos[1] - stick_display_radius,
-    l_thumb_stick_pos[0] + stick_display_radius, l_thumb_stick_pos[1] + stick_display_radius,
+    -9999, -9999, -9999, -9999,
     width=outline_width, outline=text_color
 )
 l_thumb_stick_cross = canvas.create_text(
-    l_thumb_stick_pos[0], l_thumb_stick_pos[1], fill=text_color,
+    -9999, -9999, fill=text_color,
     text="+", font=text_font
 )
 
@@ -424,7 +426,7 @@ mode_display_bg = canvas.create_rectangle(
 )
 mode_display = canvas.create_text(
     l_thumb_pos[0], margin * 1.5, fill=text_color,
-    text="No mode selected", font=text_font
+    text="", font=text_font
 )
 
 keys_pressed_display_bg = canvas.create_rectangle(
@@ -526,6 +528,18 @@ vertical_deadzone_right_slider.set(vertical_deadzone_right)
 canvas.create_window(margin * 0.5, margin * (3.5 + 6), anchor=tk.NW, window=vertical_deadzone_right_slider)
 
 
+def change_cpu_cycle_sleep(e):
+    global cpu_cycle_sleep
+    cpu_cycle_sleep = cpu_cycle_sleep_slider.get()
+
+cpu_cycle_sleep_slider = tk.Scale(None, from_=1, to=200, resolution=1, orient=tk.HORIZONTAL, command=change_cpu_cycle_sleep)
+cpu_cycle_sleep_slider.config(
+    bg=button_color, fg=text_color, highlightthickness=0, borderwidth=0, troughcolor=gear_background_color, label="CPU Sleep"
+)
+cpu_cycle_sleep_slider.set(cpu_cycle_sleep)
+canvas.create_window(margin * 0.5, canvas_dimensions[1] - margin * (3.5), anchor=tk.SW, window=cpu_cycle_sleep_slider)
+
+
 def change_vibration_intensity(e):
     global vibration_intensity
     vibration_intensity = vibration_intensity_slider.get()
@@ -574,6 +588,8 @@ column_innermargin_outer_slider.config(
 column_innermargin_outer_slider.set(column_innermargin_outer)
 canvas.create_window(canvas_dimensions[0] - margin * 0.5, canvas_dimensions[1] - margin * (3.5 + 0), anchor=tk.SE, window=column_innermargin_outer_slider)
 
+# Update gear display initially
+update_gear_display()
 
 # Prepare controllers
 class Controller:
@@ -657,7 +673,6 @@ def my_main_loop():
         stick_pos_y = XInput.get_thumb_values(state)[0][1]
 
         canvas.itemconfig(cur_gear_display, text="N")
-        canvas.itemconfig(mode_display, text=gear_modes[gear_mode][0])
 
         # Select gear and change gear display
         gear_selected = -1
@@ -714,7 +729,7 @@ def my_main_loop():
             XInput.set_vibration(gear_controller_index, 0.0, 0.0)
             gear_controller.vibration_countdown = -1
 
-    root.after(1 if root.focus_displayof() else (cpu_cycle_limit_key_spam if key_spam_mode else cpu_cycle_limit), my_main_loop)
+    root.after(1 if root.focus_displayof() else cpu_cycle_sleep, my_main_loop)
 
 root.after(1, my_main_loop)
 root.mainloop()
