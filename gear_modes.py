@@ -1,6 +1,6 @@
 gear_modes = [
     (
-        "0 Gears",  # Name
+        "User Defined",  # Name
         0,          # Column count
         (           # Gears
             (),
@@ -42,6 +42,16 @@ gear_modes = [
         (
             (
                 ("1", "num1"), ("3", "num3"), ("5", "num5"), ("7", "num7"),
+                ("2", "num2"), ("4", "num4"), ("6", "num6"), ("R", "num0")
+            ),
+        )
+    ),
+    (
+        "6 Gears (Double 5)",
+        4,
+        (
+            (
+                ("1", "num1"), ("3", "num3"), ("5", "num5"), ("5", "num5"),
                 ("2", "num2"), ("4", "num4"), ("6", "num6"), ("R", "num0")
             ),
         )
