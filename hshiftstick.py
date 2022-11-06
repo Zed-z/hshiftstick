@@ -19,6 +19,8 @@ pydirectinput.KEYBOARD_MAPPING['num7'] = 0x47
 pydirectinput.KEYBOARD_MAPPING['num8'] = 0x48
 pydirectinput.KEYBOARD_MAPPING['num9'] = 0x49
 
+import pyvjoy
+
 try:
     import tkinter as tk
 except ImportError:
@@ -250,6 +252,12 @@ def key_press(key):
     else:
         pyautogui.keyDown(key)
 
+    try:
+        vjoy = pyvjoy.VJoyDevice(1)
+        vjoy.set_button(int(key.replace("num", "")) + 1, 1)
+    except:
+        print("No vJoy")
+
     # print("started pressing", key)
 
 def key_release(key):
@@ -257,6 +265,12 @@ def key_release(key):
         pydirectinput.keyUp(key)
     else:
         pyautogui.keyUp(key)
+
+    try:
+        vjoy = pyvjoy.VJoyDevice(1)
+        vjoy.set_button(int(key.replace("num", "")) + 1, 0)
+    except:
+        print("No vJoy")
 
     # print("stopped pressing", key)
 
@@ -738,7 +752,7 @@ def main_loop():
     # Handle XInput events
     events = get_events()
     for event in events:
-
+        print("event")
         controller = controllers[event.user_index]
 
         if event.type == EVENT_CONNECTED:
