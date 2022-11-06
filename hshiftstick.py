@@ -52,6 +52,10 @@ def cycle_gear_mode(_dir):
     if gear_mode < 0:
         gear_mode = (len(gear_modes) - 1)
 
+    # Clear custom gear zones
+    global user_gear_zones
+    user_gear_zones = []
+
     update_gear_display()
 
 def toggle_gear_layer(controller):
@@ -71,7 +75,7 @@ def update_gear_display():
     global display_radius
 
     # Update mode title
-    canvas.itemconfig(mode_display, text="Mode: " + gear_modes[gear_mode][0])
+    mode_display_set("Mode: " + gear_modes[gear_mode][0])
 
     # Reset display
     for i in range(len(gear_columns)):
@@ -82,9 +86,6 @@ def update_gear_display():
 
     global gear_zones
     gear_zones = []
-
-    global user_gear_zones
-    user_gear_zones = []
 
     for i in canvas_user_gear_zones:
         canvas.coords(
@@ -100,6 +101,27 @@ def update_gear_display():
         canvas.itemconfig(canvas_vertical_deadzone_left, fill=gear_background_color)
         canvas.itemconfig(canvas_vertical_deadzone_right, fill=gear_background_color)
         canvas.itemconfig(canvas_radial_deadzone, fill=gear_background_color)
+
+        for gz in user_gear_zones:
+
+            _gearname = gz[0]
+            _numkey = gz[1]
+            _pos_x = gz[2]
+            _pos_y = gz[3]
+            _range = gz[4]
+
+            canvas.coords(
+                canvas_user_gear_zones[int(_numkey.replace("num", ""))][0],
+                l_thumb_pos[0] + _pos_x * display_radius - _range * display_radius,
+                l_thumb_pos[1] - _pos_y * display_radius - _range * display_radius,
+                l_thumb_pos[0] + _pos_x * display_radius + _range * display_radius,
+                l_thumb_pos[1] - _pos_y * display_radius + _range * display_radius,
+            )
+
+            canvas.coords(
+                canvas_user_gear_zones[int(_numkey.replace("num", ""))][1],
+                l_thumb_pos[0] + _pos_x * display_radius, l_thumb_pos[1] - _pos_y * display_radius,
+            )
 
     else:
 
@@ -379,10 +401,12 @@ def onKeyPress(event):
                     break
 
             if _key_alredy_exists:
+                print("Changing location of", _gearname)
                 user_gear_zones[_key_index][2] = stick_pos_x
                 user_gear_zones[_key_index][3] = stick_pos_y
                 user_gear_zones[_key_index][4] = _range
             else:
+                print("Setting location of", _gearname)
                 user_gear_zones.append(
                     [
                         _gearname,
@@ -393,16 +417,7 @@ def onKeyPress(event):
                     ]
                 )
 
-            canvas.coords(
-                canvas_user_gear_zones[int(event.char)][0],
-                l_thumb_pos[0] + stick_pos_x * display_radius - _range * display_radius, l_thumb_pos[1] - stick_pos_y * display_radius - _range * display_radius,
-                l_thumb_pos[0] + stick_pos_x * display_radius + _range * display_radius, l_thumb_pos[1] - stick_pos_y * display_radius + _range * display_radius,
-            )
-
-            canvas.coords(
-                canvas_user_gear_zones[int(event.char)][1],
-                l_thumb_pos[0] + stick_pos_x * display_radius, l_thumb_pos[1] - stick_pos_y * display_radius,
-            )
+            update_gear_display()
 
 root.bind('<KeyPress>', onKeyPress)
 
@@ -516,6 +531,7 @@ l_thumb_stick_cross = canvas.create_text(
     text="+", font=text_font
 )
 
+# Mode display
 mode_display_bg = canvas.create_rectangle(
     0, 0, canvas_dimensions[0], margin * 3,
     width=0, fill=window_background_color
@@ -524,15 +540,22 @@ mode_display = canvas.create_text(
     l_thumb_pos[0], margin * 1.5, fill=text_color,
     text="", font=text_font
 )
+def mode_display_set(_text="Mode Display Text"):
+    canvas.itemconfig(mode_display, text=_text)
+mode_display_set()
 
+# Status bar
 keys_pressed_display_bg = canvas.create_rectangle(
     0, canvas_dimensions[1] - margin * 3, canvas_dimensions[0], canvas_dimensions[1],
     width=0, fill=window_background_color
 )
 keys_pressed_display = canvas.create_text(
     l_thumb_pos[0], canvas_dimensions[1] - margin * 1.5, fill=text_color,
-    text="Press LS / Start", font=text_font
+    text="", font=text_font
 )
+def status_bar_set(_text="Press LS / Start"):
+    canvas.itemconfig(keys_pressed_display, text=_text)
+status_bar_set()
 
 # Create buttons
 widget = tk.Button(None, text='Prev Mode', font=button_font)
@@ -706,7 +729,7 @@ controllers = (
 
 
 # Main loop
-def my_main_loop():
+def main_loop():
 
     global gear_controller
     global gears_enabled_global
@@ -731,9 +754,7 @@ def my_main_loop():
                 gear_controller = -1
                 gear_controller_index = -1
 
-                canvas.itemconfig(
-                    keys_pressed_display, text="Press LS / Start"
-                )
+                status_bar_set()
 
         elif event.type == EVENT_STICK_MOVED:
             if event.stick == LEFT:
@@ -823,11 +844,7 @@ def my_main_loop():
                             key_release(k)
                         gear_controller.keys_currently_pressed.remove(k)
 
-            # Display pressed key
-            canvas.itemconfig(keys_pressed_display,
-                  text="Pressed: " + " ".join(gear_controller.keys_currently_pressed) if len(
-                      gear_controller.keys_currently_pressed) > 0 else "No key pressed"
-                  )
+
 
         else:
 
@@ -875,18 +892,19 @@ def my_main_loop():
                                 key_release(k[1])
                             gear_controller.keys_currently_pressed.remove(k[1])
 
-            # Display pressed key
-            canvas.itemconfig(keys_pressed_display,
-                  text="Pressed: " + " ".join(gear_controller.keys_currently_pressed) if len(
-                      gear_controller.keys_currently_pressed) > 0 else "No key pressed"
-                  )
+        # Display pressed key
+        status_bar_set(
+            "Pressed: " + " ".join(gear_controller.keys_currently_pressed)
+            if len(gear_controller.keys_currently_pressed) > 0
+            else "No key pressed"
+        )
 
         # Stop vibration
         if gear_controller.vibration_countdown != -1 and time.time() - gear_controller.vibration_countdown > vibration_length:
             XInput.set_vibration(gear_controller_index, 0.0, 0.0)
             gear_controller.vibration_countdown = -1
 
-    root.after(1 if root.focus_displayof() else cpu_cycle_sleep, my_main_loop)
+    root.after(1 if root.focus_displayof() else cpu_cycle_sleep, main_loop)
 
-root.after(1, my_main_loop)
+root.after(1, main_loop)
 root.mainloop()
