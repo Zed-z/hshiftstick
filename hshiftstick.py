@@ -25,6 +25,30 @@ except ImportError:
     import Tkinter as tk
 import tkinter.messagebox
 
+vg_available = True
+try:
+    
+    import vgamepad as vg
+    gamepad = vg.VX360Gamepad()
+
+    gamepad_buttons = (
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_A,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_B,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_X,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_Y,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_START,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB,
+        vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB,
+    )
+
+except:
+    print("ViGEmBus not installed.")
+    vg_available = False
+
+
 import math
 import time
 
@@ -211,14 +235,19 @@ def toggle_vibration(button):
         bg=(button_active_color if vibration_enabled else button_color)
     )
 
-def toggle_key_spam_mode(button):
-    global key_spam_mode
+def toggle_gamepad_emulation(button):
+
+    if not vg_available:
+        tk.messagebox.showwarning("ViGEmBus Missing", "ViGEmBus not available - some functionality has been disabled.")
+        return
+
+    global gamepad_emulation
     global button_color
     global button_active_color
 
-    key_spam_mode = not key_spam_mode
+    gamepad_emulation = not gamepad_emulation
     button.config(
-        bg=(button_active_color if key_spam_mode else button_color)
+        bg=(button_active_color if gamepad_emulation else button_color)
     )
 
 def toggle_directinput(button):
@@ -250,6 +279,10 @@ def key_press(key):
     else:
         pyautogui.keyDown(key)
 
+    if vg_available:
+        gamepad.press_button(button=gamepad_buttons[int(key.replace("num", ""))])
+        gamepad.update()
+
     # print("started pressing", key)
 
 def key_release(key):
@@ -257,6 +290,10 @@ def key_release(key):
         pydirectinput.keyUp(key)
     else:
         pyautogui.keyUp(key)
+
+    if vg_available:
+        gamepad.release_button(button=gamepad_buttons[int(key.replace("num", ""))])
+        gamepad.update()
 
     # print("stopped pressing", key)
 
@@ -285,7 +322,7 @@ else:
     config.set("main", "display_scale", "2")
     config.set("main", "vibration_enabled", "1")
     config.set("main", "vibration_intensity", "0.5")
-    config.set("main", "key_spam_mode", "0")
+    config.set("main", "gamepad_emulation", "0")
     config.set("main", "directinput", "0")
 
     config.add_section("deadzone")
@@ -307,7 +344,9 @@ gear_mode = int(config.get("main", "gear_mode"))
 display_scale = int(config.get("main", "display_scale"))
 vibration_enabled = config.getboolean("main", "vibration_enabled")
 vibration_intensity = float(config.get("main", "vibration_intensity"))
-key_spam_mode = config.getboolean("main", "key_spam_mode")
+gamepad_emulation = config.getboolean("main", "gamepad_emulation")
+if not vg_available:
+    gamepad_emulation = False
 directinput = config.getboolean("main", "directinput")
 
 vertical_deadzone_left = float(config.get("deadzone", "vertical_deadzone_left"))
@@ -327,7 +366,7 @@ def config_save():
     config.set("main", "display_scale", str(display_scale))
     config.set("main", "vibration_enabled", str(vibration_enabled))
     config.set("main", "vibration_intensity", str(vibration_intensity))
-    config.set("main", "key_spam_mode", str(key_spam_mode))
+    config.set("main", "gamepad_emulation", str(gamepad_emulation))
     config.set("main", "directinput", str(directinput))
 
     config.set("deadzone", "vertical_deadzone_left", str(vertical_deadzone_left))
@@ -578,11 +617,11 @@ widget.config(activebackground=button_pressed_color, activeforeground=text_color
 widget.bind('<Button-1>', lambda e: toggle_vibration(widget))
 widget.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
 
-widget2 = tk.Button(None, text="Key Spam", font=button_font)
-widget2.config(bg=(button_active_color if key_spam_mode else button_color), fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding,
-              pady=button_padding)
+widget2 = tk.Button(None, text="Gamepad", font=button_font)
+widget2.config(bg=(button_active_color if gamepad_emulation else button_color), fg=text_color, highlightthickness=0, borderwidth=0, padx=button_padding,
+              pady=button_padding, state=(tk.NORMAL if vg_available else tk.DISABLED))
 widget2.config(activebackground=button_pressed_color, activeforeground=text_color)
-widget2.bind('<Button-1>', lambda e: toggle_key_spam_mode(widget2))
+widget2.bind('<Button-1>', lambda e: toggle_gamepad_emulation(widget2))
 widget2.pack(in_=None, side=tk.RIGHT, padx=button_margin, pady=button_margin)
 
 widget3 = tk.Button(None, text="Direct Input", font=button_font)
@@ -718,6 +757,7 @@ class Controller:
         self.alt_gears = False
         self.keys_currently_pressed = []
         self.vibration_countdown = -1
+        self.gear_stick = -1
 
 
 controllers = (
@@ -753,31 +793,31 @@ def main_loop():
                 gears_enabled_global = False
                 gear_controller = -1
                 gear_controller_index = -1
+                controller.gear_stick = -1
 
                 status_bar_set()
 
         elif event.type == EVENT_STICK_MOVED:
-            if event.stick == LEFT:
-                if controller.gears_enabled:
-                    l_thumb_stick_pos = (
-                        int(round(l_thumb_pos[0] + display_radius * event.x, 0)),
-                        int(round(l_thumb_pos[1] - display_radius * event.y, 0))
-                    )
-                    canvas.coords(l_thumb_stick, (
-                        l_thumb_stick_pos[0] - stick_display_radius, l_thumb_stick_pos[1] - stick_display_radius,
-                        l_thumb_stick_pos[0] + stick_display_radius, l_thumb_stick_pos[1] + stick_display_radius
-                    ))
-                    canvas.coords(l_thumb_stick_cross, (
-                        l_thumb_stick_pos[0], l_thumb_stick_pos[1],
-                    ))
+
+            if controller == gear_controller:
+                if event.stick == controller.gear_stick:
+                    if controller.gears_enabled:
+                        l_thumb_stick_pos = (
+                            int(round(l_thumb_pos[0] + display_radius * event.x, 0)),
+                            int(round(l_thumb_pos[1] - display_radius * event.y, 0))
+                        )
+                        canvas.coords(l_thumb_stick, (
+                            l_thumb_stick_pos[0] - stick_display_radius, l_thumb_stick_pos[1] - stick_display_radius,
+                            l_thumb_stick_pos[0] + stick_display_radius, l_thumb_stick_pos[1] + stick_display_radius
+                        ))
+                        canvas.coords(l_thumb_stick_cross, (
+                            l_thumb_stick_pos[0], l_thumb_stick_pos[1],
+                        ))
 
 
         elif event.type == EVENT_BUTTON_PRESSED:
-            if event.button in ("DPAD_LEFT", "LEFT_SHOULDER"):
-                cycle_gear_mode(-1)
-            elif event.button in ("DPAD_RIGHT", "RIGHT_SHOULDER"):
-                cycle_gear_mode(1)
-            elif event.button in ("START", "LEFT_THUMB"):
+
+            if event.button in ("LEFT_THUMB", "RIGHT_THUMB"):
                 if not gears_enabled_global:
 
                     # Enable gear functionality
@@ -785,11 +825,12 @@ def main_loop():
                     gears_enabled_global = True
                     gear_controller = controller
                     gear_controller_index = event.user_index
+                    controller.gear_stick = LEFT if event.button == "LEFT_THUMB" else RIGHT
 
                     # Update gear display
                     update_gear_display()
 
-                else:
+                elif controller == gear_controller:
                     toggle_gear_layer(controller)
 
     # Gear logic
@@ -797,8 +838,8 @@ def main_loop():
 
         # Stick pos
         state = XInput.get_state(gear_controller_index)
-        stick_pos_x = XInput.get_thumb_values(state)[0][0]
-        stick_pos_y = XInput.get_thumb_values(state)[0][1]
+        stick_pos_x = XInput.get_thumb_values(state)[0 if gear_controller.gear_stick == LEFT else 1][0]
+        stick_pos_y = XInput.get_thumb_values(state)[0 if gear_controller.gear_stick == LEFT else 1][1]
         # print("Stick pos: ", stick_pos_x, stick_pos_y)
 
         canvas.itemconfig(cur_gear_display, text="N")
@@ -826,8 +867,7 @@ def main_loop():
                     # Start pressing keys
                     if k not in gear_controller.keys_currently_pressed:
 
-                        if not key_spam_mode:
-                            key_press(k)
+                        key_press(k)
                         gear_controller.keys_currently_pressed.append(k)
 
                         # Vibrate
@@ -835,13 +875,10 @@ def main_loop():
                             XInput.set_vibration(gear_controller_index, vibration_intensity,
                                                  vibration_intensity)
                             gear_controller.vibration_countdown = time.time()
-                    if key_spam_mode:
-                        key_quick_press(k)
                 else:
                     # Stop pressing keys (if pressed)
                     if k in gear_controller.keys_currently_pressed:
-                        if not key_spam_mode:
-                            key_release(k)
+                        key_release(k)
                         gear_controller.keys_currently_pressed.remove(k)
 
 
@@ -875,21 +912,17 @@ def main_loop():
                         # Start pressing keys
                         if k[1] not in gear_controller.keys_currently_pressed:
 
-                            if not key_spam_mode:
-                                key_press(k[1])
+                            key_press(k[1])
                             gear_controller.keys_currently_pressed.append(k[1])
 
                             # Vibrate
                             if vibration_enabled:
                                 XInput.set_vibration(gear_controller_index, vibration_intensity, vibration_intensity)
                                 gear_controller.vibration_countdown = time.time()
-                        if key_spam_mode:
-                            key_quick_press(k[1])
                     else:
                         # Stop pressing keys (if pressed)
                         if k[1] in gear_controller.keys_currently_pressed:
-                            if not key_spam_mode:
-                                key_release(k[1])
+                            key_release(k[1])
                             gear_controller.keys_currently_pressed.remove(k[1])
 
         # Display pressed key
