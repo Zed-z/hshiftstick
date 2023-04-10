@@ -27,7 +27,7 @@ import tkinter.messagebox
 
 vg_available = True
 try:
-    
+
     import vgamepad as vg
     gamepad = vg.VX360Gamepad()
 
@@ -384,6 +384,7 @@ def config_save():
 
 # END CONFIG -----------------------------------------------------------------------------------------------------------
 
+mouse_control = True
 
 # Gear modes
 from gear_modes import *
@@ -775,6 +776,18 @@ def main_loop():
     global gears_enabled_global
     global gear_controller_index
 
+    global l_thumb_pos
+    global l_thumb_stick_pos
+
+    # Mouse input controller
+    if mouse_control:
+    gear_controller =
+        self.gears_enabled = False
+        self.alt_gears = False
+        self.keys_currently_pressed = []
+        self.vibration_countdown = -1
+        self.gear_stick = -1
+
     # Handle XInput events
     events = get_events()
     for event in events:
@@ -833,14 +846,32 @@ def main_loop():
                 elif controller == gear_controller:
                     toggle_gear_layer(controller)
 
+    # Mouse input
+    def mouse_input(event):
+        if mouse_control:
+            _mouse_x = event.x
+            _mouse_y = event.y
+
+            global l_thumb_stick_pos
+            l_thumb_stick_pos = (
+                int(round(_mouse_x - l_thumb_pos[0], 0)),
+                int(round(_mouse_y - l_thumb_pos[1], 0))
+            )
+
+    root.bind('<Motion>', mouse_input)
+
     # Gear logic
-    if gear_controller != -1:
+    if gear_controller != -1 or mouse_control:
 
         # Stick pos
-        state = XInput.get_state(gear_controller_index)
-        stick_pos_x = XInput.get_thumb_values(state)[0 if gear_controller.gear_stick == LEFT else 1][0]
-        stick_pos_y = XInput.get_thumb_values(state)[0 if gear_controller.gear_stick == LEFT else 1][1]
-        # print("Stick pos: ", stick_pos_x, stick_pos_y)
+        if mouse_control:
+            stick_pos_x = (l_thumb_stick_pos[0] - l_thumb_pos[0]) / display_radius
+            stick_pos_y = (l_thumb_stick_pos[1] - l_thumb_pos[1]) / display_radius
+        else:
+            state = XInput.get_state(gear_controller_index)
+            stick_pos_x = XInput.get_thumb_values(state)[0 if gear_controller.gear_stick == LEFT else 1][0]
+            stick_pos_y = XInput.get_thumb_values(state)[0 if gear_controller.gear_stick == LEFT else 1][1]
+            # print("Stick pos: ", stick_pos_x, stick_pos_y)
 
         canvas.itemconfig(cur_gear_display, text="N")
 
