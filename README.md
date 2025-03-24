@@ -3,6 +3,10 @@
  - Binds analog positions to keyboard keys
  - Multiple gear amounts and gear layer support
 
+Feature rich interface!             |  Many input and output options!
+:-------------------------:|:-------------------------:
+![](promo1.png)  |  ![](promo2.png)
+
 # Required packages
  - python
  - Xinput-Python

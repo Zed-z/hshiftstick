@@ -413,7 +413,7 @@ vibration_length = 0.15
 # Prepare canvas
 root = tk.Tk()
 root.config(bg=gear_background_color)
-root.title("HStickShift")
+root.title("HStickShift - https://github.com/Zed-z/hshiftstick")
 root.iconbitmap(resource_path("icon.ico"))
 
 # Key handling
